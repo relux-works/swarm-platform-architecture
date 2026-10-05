@@ -14,6 +14,34 @@ Per TBK, this design and Ivan's R191 package cover the same layer. Both should g
 - **Objections 3–5 resolved:** resume re-resolves the pin and refuses on drift (§4.2); preserve only within the same managed home (§4.4); the handoff package carries `lock_sha256` + fragment digest and never secrets (§4.4).
 - **Roadmap alignment** with Gate A, fragment v4, KP and CIP-0003 (§8). Curator's open questions are in §7 with our recommendations.
 
+
+## 0.1 v1.1 amendments from the board advice round (2026-10-05)
+
+Sources: `research/tb-keeper-board-advice-2026-10-05.md` (TBK-B) and `research/curator-board-advice-2026-10-05.md` (CUR-B). No objections in principle. One hard line was adopted:
+
+- **B2 may only NARROW, never widen.** A Playbook cannot relax kernel or platform invariants. These stay OUTSIDE B2:
+  - the CR lifecycle and its state machine;
+  - Story worktree isolation, checkpoint and converge, and the stale-tree check (tb-R182);
+  - integrate and landing transactions: signed exact-head ff and junction proof (R69/R71, tb-R189, tb-R192);
+  - the validation FIFO and machine ceilings (B6);
+  - review-contract evidence (R141/R170/R161);
+  - board goal revisions with `handoff_ref` (session-host §8);
+  - activity and audit logs, resources and the evidence store (R185/R186).
+  Landing windows and rulings are arbitration protocol, neither kernel nor flow. Flow-config validation (flow-config-load) rejects any rule that widens one of these (TBK-B §1).
+- **B5 authority stays with the board.** The goal provider is the DELIVERY channel (stdin nudge). The board remains the AUTHOR and source of truth of goal revisions, and park and resume bind to them through `handoff_ref`. A provider-owned goal applies only to board-free sessions, such as the smart Ralph loop for keepers. Agenda item R2 of the joint review (TBK-B §3; CUR-B B5).
+- **B3 resolves a role to a Curator profile reference with an exact pin**, not to raw skills and instructions. Each task record pins `profile_digest` next to `flow_digest`. Resume re-resolves both and refuses on drift (CUR-B B3).
+- **B4 spawn:** curator-run compose-only, then `ax start --launch-plan`. The board never spells runtime flags and never reads fragments (CUR-B B4).
+- **The board RECORDS but never CHOOSES** the credential mode (CIP-0003: per-home, token, helper) and the project-context mode (CIP-0002). Both are launch-plan properties (CUR-B).
+- **Migration:** the flow facade over the current kernel is built in the private session-split fork (R188). It reaches live main only through the gated merge-back, and no extraction code lands before the joint review (tb-R191) (TBK-B §2).
+- **Added to scope as platform services** (TBK-B §4):
+  - the remote board (task-board server, export, import and transfer);
+  - the evidence store (R185 L2);
+  - resources with NUL hygiene (R176);
+  - commit signing and identity;
+  - the binary-swap discipline (R55);
+  - CI runner topology and the public-repo rules (tb-R190);
+  - per-host capacity (ceilings, the R193 build lock).
+
 ## 1. Goals and non-goals
 
 Goals:
