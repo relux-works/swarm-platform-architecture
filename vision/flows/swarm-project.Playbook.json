@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "description": "VISION v1 §5.2 illustration (not checked: curator playbook check ships in PC1). A project playbook that extends today's task-board flow (task-board-default, research/playbook/examples/default.playbook.json) and writes only its differences. (1) The dev flow keeps today's statuses and pins the owner's roles per status: analysis = solution-architect, development = developer, testing = tester, reviewing = reviewer. testing is the only new state; today the tester role starts in development. (2) A design-task type with its own lifecycle: analysis = product, design = designer, review = product. Every move into an agent-owned state carries spawn.owner, which the flow engine (B2) hands to the role router (B3). Role pins are workflow structure, so a change to them waits for a person's confirmation (playbook spec §2.4).",
+  "description": "ILLUSTRATIVE AND NON-ACTIVATABLE (VISION v1.2 §5.2, contracts/kernel-guards.md §6). Not checked: curator playbook check and the narrow check ship in PC1, and the base task-board-default is not pinned here. Each state names its kernel class (kernel-policy/1), which the kernel guards use whatever the flow says. A project playbook that extends today's task-board flow (task-board-default, research/playbook/examples/default.playbook.json) and writes only its differences. (1) The dev flow keeps today's statuses and pins the owner's roles per status: analysis = solution-architect, development = developer, testing = tester, reviewing = reviewer. testing is the only new state; today the tester role starts in development. (2) A design-task type with its own lifecycle: analysis = product, design = designer, review = product. Every move into an agent-owned state carries spawn.owner, which the flow engine (B2) hands to the role router (B3). Role pins are workflow structure, so a change to them waits for a person's confirmation (playbook spec §2.4).",
   "extends": "task-board-default",
   "roles": {
     "product": {
@@ -33,10 +33,10 @@
   "workflows": {
     "leaf": {
       "states": {
-        "analysis": { "owner": "solution-architect" },
-        "development": { "owner": "developer" },
-        "testing": { "owner": "tester", "description": "New state: the tester's pass before review." },
-        "reviewing": { "owner": "reviewer" }
+        "analysis": { "owner": "solution-architect", "kernel_class": "work" },
+        "development": { "owner": "developer", "kernel_class": "work" },
+        "testing": { "owner": "tester", "kernel_class": "work", "description": "New state: the tester's pass before review." },
+        "reviewing": { "owner": "reviewer", "kernel_class": "review" }
       },
       "transitions": [
         { "from": "*", "to": "analysis", "actions": ["spawn.owner"] },
@@ -66,6 +66,12 @@
         },
         {
           "from": "testing",
+          "to": "to-review",
+          "guards": ["blockers.clear", "outcome.present", { "guard": "verdict", "is": "accepted" }],
+          "description": "Explicit testing success path: the tester's accepted verdict is required, so no inherited wildcard decides it."
+        },
+        {
+          "from": "testing",
           "to": "to-dev",
           "guards": [{ "guard": "verdict", "is": "changes_requested" }],
           "description": "The tester sends the work back; the orchestrator re-queues it."
@@ -76,13 +82,13 @@
     "design": {
       "initial": "open",
       "states": {
-        "open": { "owner": "orchestrator", "requires": ["description"] },
-        "analysis": { "owner": "product" },
-        "design": { "owner": "designer" },
-        "review": { "owner": "product" },
-        "blocked": { "owner": "orchestrator" },
-        "done": { "terminal": true },
-        "closed": { "terminal": true, "resolution": ["wont-do", "duplicate", "obsolete"] }
+        "open": { "owner": "orchestrator", "kernel_class": "work", "requires": ["description"] },
+        "analysis": { "owner": "product", "kernel_class": "work" },
+        "design": { "owner": "designer", "kernel_class": "work" },
+        "review": { "owner": "product", "kernel_class": "review" },
+        "blocked": { "owner": "orchestrator", "kernel_class": "blocked" },
+        "done": { "terminal": true, "kernel_class": "terminal_success" },
+        "closed": { "terminal": true, "kernel_class": "terminal_other", "resolution": ["wont-do", "duplicate", "obsolete"] }
       },
       "transitions": [
         { "from": "open", "to": "analysis", "guards": ["blockers.clear"], "actions": ["spawn.owner"] },
@@ -92,7 +98,7 @@
         { "from": "review", "to": "done", "guards": [{ "guard": "verdict", "is": "accepted" }] },
         { "from": "*", "to": "blocked" },
         { "from": "blocked", "to": "open", "on": { "event": "blockers.terminal" } },
-        { "from": "*", "to": "closed" }
+        { "from": "*", "to": "closed", "guards": [{ "guard": "actor", "is": ["orchestrator", "human"] }], "description": "Closure needs an orchestrator or a person; a run cannot close its own element." }
       ]
     }
   },

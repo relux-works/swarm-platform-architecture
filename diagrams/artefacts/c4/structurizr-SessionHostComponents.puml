@@ -1,0 +1,76 @@
+@startuml
+title <size:24>Component View: Swarm Platform - Session Host (M1 + M2)</size>\n<size:24>Session host internals (M1 + M2): supervisor, admission and fences, holder, Context Engine, adapters, goal ledger, host store</size>
+
+set separator none
+left to right direction
+
+<style>
+  root {
+    BackgroundColor: #ffffff
+    FontColor: #444444
+  }
+</style>
+
+!include <C4/C4>
+!include <C4/C4_Context>
+!include <C4/C4_Container>
+!include <C4/C4_Component>
+
+Person(Cofounderoperator, "Co-founder / operator", $descr="Runs nodes, reviews architecture, attaches to sessions", $tags="", $link="")
+
+System_Boundary("SwarmPlatform_boundary", "Swarm Platform", $tags="") {
+  Container_Boundary("SwarmPlatform.SessionHostM1M2_boundary", "Session Host (M1 + M2)", $tags="") {
+    Component(SwarmPlatform.SessionHostM1M2.ContextEngineM2, "Context Engine (M2)", $techn="Go package", $descr="Dispatcher (the only stdin writer), delivery evidence, interactions, export/seed of swarm-handoff/2, resolve_ref, egress projections", $tags="", $link="")
+    Component(SwarmPlatform.SessionHostM1M2.HarnessAdapters, "Harness Adapters", $techn="Go package", $descr="claude-stream-json, codex-app-server, muse-serve (hosted-stream/1), pty-preserve; readiness grammar pinned per release; unknown parks", $tags="", $link="")
+    Component(SwarmPlatform.SessionHostM1M2.GoalLedger, "Goal Ledger", $techn="Go package", $descr="Board-free goals (CAS, caller-derived author, budgets) and delivery records for board goal revisions", $tags="", $link="")
+    ComponentDb(SwarmPlatform.SessionHostM1M2.HostStore, "Host Store", $techn="Files, append-only, owner-only", $descr="Journal, durable inbox, fences, plans, protected source storage (transcripts, tool outputs, patches)", $tags="", $link="")
+    Component(SwarmPlatform.SessionHostM1M2.SupervisorM1, "Supervisor (M1)", $techn="Go", $descr="Plan intake (ax start --launch-plan contract, strict mode), session/execution registry, controller epochs, restart, resume, takeover, reconciliation, protected credential lookup at exec", $tags="", $link="")
+    Component(SwarmPlatform.SessionHostM1M2.AdmissionandFences, "Admission and Fences", $techn="Go", $descr="admit() at every typed mutation; persisted admission fence open/closed/update_lock; durable idempotent enqueue (ack after fsync)", $tags="", $link="")
+    Component(SwarmPlatform.SessionHostM1M2.ExecutionHolder, "Execution Holder", $techn="Go process", $descr="One per execution: native process, PTY or framed pipes, exclusive input lease; no goal, board, carrier or journal semantics", $tags="", $link="")
+  }
+
+  Container(SwarmPlatform.AgentHarnessSession, "Agent Harness Session", $techn="Native CLI", $descr="Claude Code, Codex, Muse or Pi process in a Curator managed tool home (HOME kept)", $tags="", $link="")
+  Container(SwarmPlatform.BridgeM3, "Bridge (M3)", $techn="agent-session-bridge", $descr="Hosts provider processes; trust gate; durable bridge-local admission; host enqueue; audience-checked outbox; tails", $tags="", $link="")
+  Container(SwarmPlatform.Trust, "Trust", $techn="mandate CLI + library", $descr="curator-trust + mandates: exact-byte verification, grants, revocation snapshots, capability tokens; assurance mode T (mode S not claimed)", $tags="", $link="")
+  Container(SwarmPlatform.RemoteExecutor, "Remote Executor", $techn="rwh", $descr="Runs a harness on another host from a pin-carrying launch intent; tools local and jailed; returns the accepted pin and plan digest", $tags="", $link="")
+  Container(SwarmPlatform.CapacityS3, "Capacity (S3)", $techn="extracted from task-board", $descr="Slots, per-host gates (disk, CPU idle, build lock, syspolicyd), lease transfer, validation FIFO (board part B6)", $tags="", $link="")
+  Container(SwarmPlatform.ProductRegistryKeeper, "Product Registry / Keeper", $techn="curator-keeper registry", $descr="Products, projects, versioned project bindings (hosts, base, jail, egress, rooms, role bindings with slots), up after reboot", $tags="", $link="")
+  Container(SwarmPlatform.Launcherthinclient, "Launcher (thin client)", $techn="curator run (canonical) / swarm launch (optional wrapper)", $descr="Launch transaction: prepare, capacity, compose, compare expect_pin, admit, start, initialize, ready, with compensation. Never reads a fragment or store content, spells a flag, execs or holds", $tags="", $link="")
+  Container(SwarmPlatform.Composer, "Composer", $techn="curator-run + agents-management (one construction site)", $descr="The only composer and fragment reader: resolves the role profile, builds one Decision 0013 plan (interactive, headless, hosted-stream with session-start permission frames); compose-only and compare-only answers", $tags="", $link="")
+}
+
+Rel(SwarmPlatform.AgentHarnessSession, SwarmPlatform.BridgeM3, "Agent runs tail commands", $techn="shell tool", $tags="", $link="")
+Rel(SwarmPlatform.BridgeM3, SwarmPlatform.CapacityS3, "Checks nudge budget", $techn="acquire()", $tags="", $link="")
+Rel(SwarmPlatform.RemoteExecutor, SwarmPlatform.SessionHostM1M2.HarnessAdapters, "Relays turns and output", $techn="adapter over rwh", $tags="", $link="")
+Rel(Cofounderoperator, SwarmPlatform.Launcherthinclient, "Launches keepers and orchestrators", $techn="curator run", $tags="", $link="")
+Rel(Cofounderoperator, SwarmPlatform.SessionHostM1M2.SupervisorM1, "Lists, parks, restarts; R55 binary swap in the maintenance slot", $techn="CLI (signed control)", $tags="", $link="")
+Rel(Cofounderoperator, SwarmPlatform.SessionHostM1M2.ExecutionHolder, "Attaches with an exclusive input lease", $techn="terminal.raw grant", $tags="", $link="")
+Rel(SwarmPlatform.Launcherthinclient, SwarmPlatform.Composer, "Asks for one plan (compose-only); compares expect_pin", $techn="curator-run, launch intent", $tags="", $link="")
+Rel(SwarmPlatform.Launcherthinclient, SwarmPlatform.CapacityS3, "Slot and per-host gates", $techn="admit_host()", $tags="", $link="")
+Rel(SwarmPlatform.Launcherthinclient, SwarmPlatform.ProductRegistryKeeper, "Reads the versioned project binding", $techn="binding()", $tags="", $link="")
+Rel(SwarmPlatform.Launcherthinclient, SwarmPlatform.SessionHostM1M2.SupervisorM1, "Hands the composed plan to intake; drives initialize", $techn="ax start --launch-plan contract", $tags="", $link="")
+Rel(SwarmPlatform.Launcherthinclient, SwarmPlatform.RemoteExecutor, "Sends a launch intent with profile_pin and binding pin", $techn="rwh", $tags="", $link="")
+Rel(SwarmPlatform.Launcherthinclient, SwarmPlatform.BridgeM3, "Binds I/O providers at initialize", $techn="bind()", $tags="", $link="")
+Rel(SwarmPlatform.Launcherthinclient, SwarmPlatform.Trust, "Consumes mandate for privileged steps", $techn="mandate consume", $tags="", $link="")
+Rel(SwarmPlatform.SessionHostM1M2.SupervisorM1, SwarmPlatform.SessionHostM1M2.AdmissionandFences, "Every typed mutation; fence changes", $techn="admit(), fence", $tags="", $link="")
+Rel(SwarmPlatform.SessionHostM1M2.SupervisorM1, SwarmPlatform.SessionHostM1M2.ExecutionHolder, "Starts, stops, confirms absence", $techn="controller epoch", $tags="", $link="")
+Rel(SwarmPlatform.SessionHostM1M2.SupervisorM1, SwarmPlatform.Composer, "Compare-only pin answer on resume; new plan only for rebuild", $techn="compose-only", $tags="", $link="")
+Rel(SwarmPlatform.SessionHostM1M2.SupervisorM1, SwarmPlatform.SessionHostM1M2.ContextEngineM2, "Export, seed, reconcile unknown deliveries (opaque refs only)", $techn="Go API", $tags="", $link="")
+Rel(SwarmPlatform.SessionHostM1M2.SupervisorM1, SwarmPlatform.CapacityS3, "Rechecks gates before exec; holds the transferred lease", $techn="admit_host/release", $tags="", $link="")
+Rel(SwarmPlatform.SessionHostM1M2.AdmissionandFences, SwarmPlatform.Trust, "Re-verifies grants and revocation at enqueue and dispatch", $techn="verify/granted", $tags="", $link="")
+Rel(SwarmPlatform.SessionHostM1M2.AdmissionandFences, SwarmPlatform.SessionHostM1M2.HostStore, "Persists fences and the durable inbox", $techn="fsync", $tags="", $link="")
+Rel(SwarmPlatform.SessionHostM1M2.ContextEngineM2, SwarmPlatform.SessionHostM1M2.AdmissionandFences, "Dispatches only admitted items while the fence is open", $techn="admit()", $tags="", $link="")
+Rel(SwarmPlatform.SessionHostM1M2.ContextEngineM2, SwarmPlatform.SessionHostM1M2.HarnessAdapters, "Writes input, reads events", $techn="dispatch/observe", $tags="", $link="")
+Rel(SwarmPlatform.SessionHostM1M2.ContextEngineM2, SwarmPlatform.SessionHostM1M2.HostStore, "Appends events, stores packages and source material", $techn="append", $tags="", $link="")
+Rel(SwarmPlatform.SessionHostM1M2.HarnessAdapters, SwarmPlatform.SessionHostM1M2.ExecutionHolder, "Turn input and output", $techn="framed pipes / PTY", $tags="", $link="")
+Rel(SwarmPlatform.SessionHostM1M2.ExecutionHolder, SwarmPlatform.AgentHarnessSession, "Execs and holds the process", $techn="process group", $tags="", $link="")
+Rel(SwarmPlatform.SessionHostM1M2.GoalLedger, SwarmPlatform.SessionHostM1M2.HostStore, "Stores goals and delivery records", $techn="CAS", $tags="", $link="")
+Rel(SwarmPlatform.ProductRegistryKeeper, SwarmPlatform.SessionHostM1M2.SupervisorM1, "Requests restore after reboot (only automatic requester)", $techn="up() -> resume()", $tags="", $link="")
+Rel(SwarmPlatform.BridgeM3, SwarmPlatform.Trust, "Verifies signatures, grants, mandates", $techn="verify/granted", $tags="", $link="")
+Rel(SwarmPlatform.BridgeM3, SwarmPlatform.SessionHostM1M2.AdmissionandFences, "Durable idempotent enqueue; acceptance after host ack", $techn="enqueue(idem_key)", $tags="", $link="")
+Rel(SwarmPlatform.BridgeM3, SwarmPlatform.SessionHostM1M2.ContextEngineM2, "Observes projected output, receipts", $techn="observe()", $tags="", $link="")
+Rel(SwarmPlatform.BridgeM3, SwarmPlatform.SessionHostM1M2.GoalLedger, "Goal calls on behalf of tails and the goal provider", $techn="goal.* (typed)", $tags="", $link="")
+
+SHOW_LEGEND(true)
+hide stereotypes
+@enduml

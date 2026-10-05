@@ -1,0 +1,67 @@
+@startuml
+title <size:24>Component View: Swarm Platform - Bridge (M3)</size>\n<size:24>Bridge internals (M3): core, trust gate, store, plugin ABI, tails, provider child processes</size>
+
+set separator none
+left to right direction
+
+<style>
+  root {
+    BackgroundColor: #ffffff
+    FontColor: #444444
+  }
+</style>
+
+!include <C4/C4>
+!include <C4/C4_Context>
+!include <C4/C4_Container>
+!include <C4/C4_Component>
+
+System(MatrixHomeservera2a, "Matrix Homeserver (a2a)", $descr="Spaces, rooms and threads; a2a mailbox and identities", $tags="", $link="")
+
+System_Boundary("SwarmPlatform_boundary", "Swarm Platform", $tags="") {
+  Container_Boundary("SwarmPlatform.BridgeM3_boundary", "Bridge (M3)", $tags="") {
+    Component(SwarmPlatform.BridgeM3.BridgeCore, "Bridge Core", $techn="Go", $descr="Binds providers to sessions with host-assigned handles, derives principals, enqueues to the host, staged receipts, egress projections", $tags="", $link="")
+    Component(SwarmPlatform.BridgeM3.TrustGate, "Trust Gate", $techn="Go", $descr="Exact-byte signature, enrolled identity, grant scope for action and target, freshness, replay and id claims, binding revision; verdicts authoritative, host_authored, agent_authored, data, quarantine, reject", $tags="", $link="")
+    ComponentDb(SwarmPlatform.BridgeM3.BridgeStore, "Bridge Store", $techn="Files, append-only", $descr="Id claims, admission records, doorbell mailbox, outbox, audit log", $tags="", $link="")
+    Component(SwarmPlatform.BridgeM3.PluginABI, "Plugin ABI", $techn="JSONL over stdio", $descr="swarm-plugin/1: pinned executables, handles, secret broker, limits, restart recovery", $tags="", $link="")
+    Component(SwarmPlatform.BridgeM3.TailsCLI, "Tails CLI", $techn="CLI", $descr="swarm-tail goal and park (no mandate); post and inbox read (binding grant; post rate-limited and audited); session token = same-UID guardrail", $tags="", $link="")
+    Component(SwarmPlatform.BridgeM3.MatrixProvider, "Matrix Provider", $techn="Child process over a2a", $descr="Subscribes to rooms and threads, persists before advancing the cursor, emits envelopes, posts projected output", $tags="", $link="")
+    Component(SwarmPlatform.BridgeM3.GoalProvider, "Goal Provider", $techn="Child process", $descr="Scheduler only: nudges for active goals through host enqueue; no goal truth", $tags="", $link="")
+    Component(SwarmPlatform.BridgeM3.TerminalWatch, "Terminal Watch", $techn="Child process", $descr="Watch-only output projection; raw input goes through the holder lease", $tags="", $link="")
+  }
+
+  Container(SwarmPlatform.AgentHarnessSession, "Agent Harness Session", $techn="Native CLI", $descr="Claude Code, Codex, Muse or Pi process in a Curator managed tool home (HOME kept)", $tags="", $link="")
+  Container(SwarmPlatform.Trust, "Trust", $techn="mandate CLI + library", $descr="curator-trust + mandates: exact-byte verification, grants, revocation snapshots, capability tokens; assurance mode T (mode S not claimed)", $tags="", $link="")
+  Container(SwarmPlatform.CapacityS3, "Capacity (S3)", $techn="extracted from task-board", $descr="Slots, per-host gates (disk, CPU idle, build lock, syspolicyd), lease transfer, validation FIFO (board part B6)", $tags="", $link="")
+  Container(SwarmPlatform.Board, "Board", $techn="task-board kernel + curator-playbook", $descr="Task management with externally configured flows (Playbook.json) under kernel guards; a client of the launcher, bridge, capacity and registry; built in Phase 4", $tags="", $link="")
+  Container(SwarmPlatform.Launcherthinclient, "Launcher (thin client)", $techn="curator run (canonical) / swarm launch (optional wrapper)", $descr="Launch transaction: prepare, capacity, compose, compare expect_pin, admit, start, initialize, ready, with compensation. Never reads a fragment or store content, spells a flag, execs or holds", $tags="", $link="")
+  Container(SwarmPlatform.SessionHostM1M2, "Session Host (M1 + M2)", $techn="agent-session-host (Phase-0 baseline: tb-sessiond)", $descr="One codebase: supervisor, minimal execution holders, host-enforced admission and fences, Context Engine package, goal ledger, host-owned journal", $tags="", $link="")
+}
+
+Rel(SwarmPlatform.BridgeM3.PluginABI, SwarmPlatform.BridgeM3.TerminalWatch, "bind/output", $techn="swarm-plugin/1", $tags="", $link="")
+Rel(SwarmPlatform.BridgeM3.TailsCLI, SwarmPlatform.BridgeM3.BridgeCore, "goal, park, post, inbox read", $techn="unix socket + session token", $tags="", $link="")
+Rel(SwarmPlatform.AgentHarnessSession, SwarmPlatform.BridgeM3.TailsCLI, "Agent runs tail commands", $techn="shell tool", $tags="", $link="")
+Rel(SwarmPlatform.BridgeM3.MatrixProvider, MatrixHomeservera2a, "Subscribes and posts", $techn="a2a / Matrix CS API", $tags="", $link="")
+Rel(SwarmPlatform.BridgeM3.GoalProvider, SwarmPlatform.CapacityS3, "Checks nudge budget", $techn="acquire()", $tags="", $link="")
+Rel(SwarmPlatform.Board, SwarmPlatform.Trust, "Asks whether a version is confirmed or covered", $techn="confirmed/granted/narrowed", $tags="", $link="")
+Rel(SwarmPlatform.Board, SwarmPlatform.Launcherthinclient, "Launches the role with the spawn key", $techn="launch(LaunchRequest)", $tags="", $link="")
+Rel(SwarmPlatform.Board, SwarmPlatform.BridgeM3.PluginABI, "Publishes goal revisions, receives outcome proposals", $techn="swarm-plugin/1", $tags="", $link="")
+Rel(SwarmPlatform.Board, SwarmPlatform.CapacityS3, "Slots, gates and validation FIFO", $techn="acquire/queue", $tags="", $link="")
+Rel(SwarmPlatform.Launcherthinclient, SwarmPlatform.CapacityS3, "Slot and per-host gates", $techn="admit_host()", $tags="", $link="")
+Rel(SwarmPlatform.Launcherthinclient, SwarmPlatform.SessionHostM1M2, "Hands the composed plan to intake; drives initialize", $techn="ax start --launch-plan contract", $tags="", $link="")
+Rel(SwarmPlatform.Launcherthinclient, SwarmPlatform.BridgeM3.BridgeCore, "Binds I/O providers at initialize", $techn="bind()", $tags="", $link="")
+Rel(SwarmPlatform.Launcherthinclient, SwarmPlatform.Trust, "Consumes mandate for privileged steps", $techn="mandate consume", $tags="", $link="")
+Rel(SwarmPlatform.SessionHostM1M2, SwarmPlatform.CapacityS3, "Rechecks gates before exec; holds the transferred lease", $techn="admit_host/release", $tags="", $link="")
+Rel(SwarmPlatform.SessionHostM1M2, SwarmPlatform.Trust, "Re-verifies grants and revocation at enqueue and dispatch", $techn="verify/granted", $tags="", $link="")
+Rel(SwarmPlatform.SessionHostM1M2, SwarmPlatform.AgentHarnessSession, "Execs and holds the process", $techn="process group", $tags="", $link="")
+Rel(SwarmPlatform.BridgeM3.BridgeCore, SwarmPlatform.BridgeM3.TrustGate, "Checks every inbound envelope", $techn="verify()", $tags="", $link="")
+Rel(SwarmPlatform.BridgeM3.TrustGate, SwarmPlatform.Trust, "Verifies signatures, grants, mandates", $techn="verify/granted", $tags="", $link="")
+Rel(SwarmPlatform.BridgeM3.BridgeCore, SwarmPlatform.BridgeM3.BridgeStore, "Atomic id claim and admission record; outbox; audit", $techn="local transaction", $tags="", $link="")
+Rel(SwarmPlatform.BridgeM3.BridgeCore, SwarmPlatform.SessionHostM1M2, "Durable idempotent enqueue; acceptance after host ack", $techn="enqueue(idem_key)", $tags="", $link="")
+Rel(SwarmPlatform.BridgeM3.BridgeCore, SwarmPlatform.BridgeM3.PluginABI, "Runs provider processes through", $techn="JSONL", $tags="", $link="")
+Rel(SwarmPlatform.BridgeM3.PluginABI, SwarmPlatform.BridgeM3.MatrixProvider, "bind/output/receipt", $techn="swarm-plugin/1", $tags="", $link="")
+Rel(SwarmPlatform.BridgeM3.PluginABI, SwarmPlatform.BridgeM3.GoalProvider, "bind/output/receipt", $techn="swarm-plugin/1", $tags="", $link="")
+
+SHOW_LEGEND(true)
+hide stereotypes
+@enduml

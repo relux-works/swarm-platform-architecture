@@ -1,64 +1,66 @@
 @startuml keeper-start
 !theme plain
-title Product keeper start (thin launcher + composer + session manager intake + context bridge with a Matrix provider)
+title Product keeper start: launch transaction through curator run, session host intake, bridge with a Matrix provider; resume compares first
 
 actor "Operator" as Op
-participant "Launcher\n(thin client)" as L
+participant "Launcher\n(curator run)" as L
 participant "Composer\n(curator-run)" as C
 participant "Environment\n(Curator)" as Env
-participant "Product registry" as Reg
-participant "Provider limits" as Lim
-participant "Session manager" as SM
-participant "Context manager" as CM
-participant "Context bridge" as BR
+participant "Product registry\n(S4)" as Reg
+participant "Capacity\n(S3)" as Cap
+participant "Session host\n(M1 + M2)" as SH
+participant "Bridge\n(M3)" as BR
 participant "Matrix provider" as MP
-participant "Goal provider" as GP
 participant "Harness\n(X_keeper)" as H
 database "Matrix (a2a)" as MX
 
-Op -> L: swarm launch ~--profile product-keeper\n~--project X ~--mode interactive
+Op -> L: curator run ~--profile product-keeper (binding X, interactive)
 L -> Reg: binding(X)
-Reg --> L: product dir, rooms #X-lobby #X-broadcast #X-system
-L -> Lim: acquire(provider slot)
-Lim --> L: lease
-L -> C: compose-only(profile product-keeper, interactive)
-C -> Env: env resolve <env> ~--profile product-keeper ~--format json
-Env --> C: launch-env fragment (tool home, lock_sha256,\ninstructions, skills, MCP, command_environment)
-note right of Env
-  Tool home only (CLAUDE_CONFIG_DIR /
-  CODEX_HOME / XDG); HOME kept.
-  Claude: one /login per managed home,
-  or CIP-0003 token once adopted
-end note
-C -> C: agents-management plan\n(one construction site)
-C --> L: plan + lock_sha256 + fragment digest
-L -> SM: ax start X_keeper ~--launch-plan - (policy=always-restart)
-SM -> H: exec under holder
-SM -> CM: channel(session) granted
-CM -> H: open adapter (stream-json / app-server)
-SM --> L: session_id
+Reg --> L: binding{id, rev, digest}: product dir,\nrooms #X-lobby #X-broadcast #X-system
+L -> Cap: admit_host(local, keeper)
+Cap --> L: lease
 
-== I/O bindings ==
-L -> BR: bind(session, matrix, rooms X-*)
-BR -> MP: bind{binding_id, config, secret_ref}
-opt identity X_keeper does not exist yet
-  L -> L: mandate consume (identity ensure)
-  MP -> MX: identity ensure (under mandate)
-end
-MP -> MX: join and subscribe rooms
-MP --> BR: manifest + cursor
-L -> BR: bind(session, goal)
-BR -> GP: bind{binding_id}
-
-opt a handoff package exists for X_keeper
-  alt same runtime, same managed home, same lock_sha256 + fragment digest
-    L -> CM: restore(handoff, session, preserve)
-    CM -> H: native resume, replay undelivered envelopes
-  else pin or home differs
-    L -> CM: restore(handoff, session, rebuild)
-    CM -> H: first framed turn: summary + goal + open items
+opt a parked logical session X_keeper exists
+  L -> SH: resume(X_keeper)
+  SH -> C: compare-only (profile_pin, fragment digest)
+  C --> SH: current digests
+  alt pin, posture or binding differs
+    SH --> L: refused{drift} (strict mode); fence stays closed
+    L --> Op: refused: accept drift explicitly (new operation, rebuild)
+  else unchanged
+    SH -> H: ax resume of the stored record; native resume;\nrestart-and-takeover steps 5-9
+    SH --> L: ready
+    L --> Op: resumed (logical_session_id, attach hint)
   end
 end
 
-L --> Op: session_id, attach hint
+alt no parked session (fresh start)
+  L -> C: compose-only(profile product-keeper, interactive)
+  C -> Env: env resolve <env> ~--profile product-keeper ~--format json
+  Env --> C: launch-env fragment (tool home, profile pin,\ninstructions, skills, MCP, command_environment)
+  note right of Env
+    Tool home only (CLAUDE_CONFIG_DIR /
+    CODEX_HOME / XDG); HOME kept.
+    Claude: one login per managed home until
+    the CIP-0003 amendment lets M1 do lookup
+  end note
+  C -> C: agents-management plan (one construction site)
+  C --> L: plan + profile_pin + fragment digest
+  L -> SH: intake (ax start X_keeper ~--launch-plan contract, strict,\npolicy=always-restart), fence closed
+  SH -> H: exec under holder; open adapter
+
+  == initialize ==
+  L -> BR: bind(session, matrix, rooms X-*)
+  BR -> MP: bind{binding_handle} (no secret values)
+  MP -> BR: secret.resolve(binding_handle, matrix token)
+  opt identity X_keeper does not exist yet
+    L -> L: mandate consume (identity ensure)
+    MP -> MX: identity ensure (under mandate)
+  end
+  MP -> MX: join and subscribe rooms
+  MP --> BR: manifest + cursor
+  SH -> SH: session token; readiness probe; fence open
+  SH --> L: ready
+  L --> Op: LaunchResult (logical_session_id, attach hint)
+end
 @enduml

@@ -1,59 +1,69 @@
 @startuml flow-config-load
 !theme plain
-title Flow config load: Playbook.json validation, activation and flow version pinning for in-flight tasks
+title Flow config load: resolve closure -> narrow check against kernel-policy/1 -> confirmation -> atomic activation with migrations -> generation fence
 
 actor "Process designer\n(agent or person)" as Dev
 database "Project repo\n(default branch)" as Git
 participant "B2 Flow engine\n(config loader)" as FE
 participant "Environment\n(curator playbook check)" as Env
+participant "Kernel guards\n(kernel-policy/1)" as KG
 participant "Trust\n(confirmed / granted / narrowed)" as T
 actor "Confirmer\n(person)" as P
 database "B1 Task store" as TS
-participant "B3 Role router" as RR
-participant "Running worker\n(pinned to D7)" as W
+participant "Running worker\n(pinned to D7, g12)" as W
 
 Dev -> Git: commit Playbook.json (adds design-task,\npins analysis -> solution-architect)
 FE -> Git: read Playbook.json at default-branch head\n(never the working tree)
-FE -> Env: resolve extends/uses from the committed lock;\nportable + machine checks
-Env --> FE: resolved configuration, digest D8, report
+FE -> Env: resolve extends/uses pinned by digest;\nportable + machine checks
+Env --> FE: resolved closure, digest D8, report
 alt check fails
-  FE -> TS: append notice "proposed head invalid";\nkeep D7 in force
+  FE -> TS: append notice "proposed head invalid"; keep D7 in force
 else valid
-  FE -> TS: list elements in states that D8 removes or renames
-  alt stranded elements and no migrations declared
-    FE -> TS: notice "activation refused: stranded elements";\nkeep D7 in force
-  else none stranded, or migrations declared
-    FE -> FE: diff D7 -> D8 by section
-    FE -> T: granted(process, kind) for each difference
-    alt every difference covered by a capability
-      T --> FE: covered
-    else workflow structure or authority changed (role pins, transitions)
-      T --> FE: not covered
-      FE -> TS: pending D8; notify confirmers
-      note right of FE
-        Until confirmed, the whole D7
-        runs; later commits wait too
-      end note
-      P -> T: task-board trust confirm (head D8)
-      T --> FE: confirmed(D8)
-    end
-    FE -> TS: store resolved D8; version in force = D8
-    opt migrations declared
-      FE -> TS: move elements old state -> new state\n(records carry flow_digest=D8, actor=kernel)
+  FE -> KG: narrow_check(resolved closure + migrations)
+  KG -> KG: every state has a kernel class; no path skips\nK1 CR acceptance, K3 landing, K5 review evidence;\nno limit above ceilings (K4); no goal writes (K6); audit kept (K7)
+  alt widens a kernel predicate
+    KG --> FE: rejected widen:K<n>:<rule>
+    FE -> TS: notice "activation refused: widens K<n>"; keep D7
+    note right of KG
+      A person's confirmation cannot waive this.
+      kernel-policy/1 changes only with a kernel
+      release installed by the operator (R55).
+    end note
+  else narrowing only
+    KG --> FE: ok
+    FE -> TS: list elements in states that D8 removes or reclassifies
+    alt stranded elements and no migrations declared
+      FE -> TS: notice "activation refused: stranded elements"; keep D7
+    else none stranded, or migrations declared
+      FE -> FE: diff D7 -> D8 by section
+      FE -> T: granted(process, kind) for each difference
+      alt every difference covered by a capability
+        T --> FE: covered
+      else workflow structure or authority changed (role pins, transitions)
+        T --> FE: not covered
+        FE -> TS: pending D8; notify confirmers
+        note right of FE
+          Until confirmed, the whole D7
+          runs; later commits wait too
+        end note
+        P -> T: task-board trust confirm (head D8)
+        T --> FE: confirmed(D8)
+      end
+      FE -> TS: activate D8 in one transaction:\nactivation lock (transitions wait), migrations\n(actor=kernel, through kguard), version in force D8,\ngeneration g12 -> g13, release
     end
   end
 end
 
 == In-flight tasks after activation ==
 note over TS, W
-  Each status record and board_ref carries its flow_digest.
-  A running worker keeps its launch pin (lock_sha256) until it hands off.
+  Each status record and board_ref carries flow_digest and flow_generation.
+  A running worker keeps its launch pin (profile_pin) until it hands off.
 end note
-W -> FE: transition(TASK-42, development -> testing)\nboard_ref.flow_digest=D7
-FE -> FE: evaluate under D8 (the version in force now)
+W -> FE: transition(TASK-42, development -> testing)\nboard_ref D7, g12
+FE -> FE: evaluate under D8 (the version in force now, g13)
 alt D8 still admits the run's role in its state
-  FE -> TS: write_status(..., flow_digest=D8)
-  FE -> RR: flow.entered under D8
+  FE -> TS: write_status(proposal, expected rev, g13)
+  TS -> TS: kguard K1-K8; commit (flow_digest D8)
 else state removed or owner changed
   FE --> W: refused (stale run)
   FE -> TS: element owned by the root orchestrator (PB 6.1)

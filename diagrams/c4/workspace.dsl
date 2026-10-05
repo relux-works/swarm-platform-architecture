@@ -1,4 +1,4 @@
-workspace "Swarm Platform" "Lightweight agent-swarm platform: target architecture v1 with the board as a flow plugin" {
+workspace "Swarm Platform" "Lightweight agent-swarm platform: target architecture v1.2 with the board as a flow plugin under kernel guards" {
   !identifiers hierarchical
 
   model {

@@ -1,61 +1,67 @@
 @startuml goal-loop
 !theme plain
-title Goal loop (smart Ralph loop): the agent sets its own goal, the goal provider nudges via stdin
+title Goal loop (smart Ralph loop, board-free): the agent sets its own goal in the host ledger; the goal provider schedules nudges through the bridge
 
 participant "Harness\n(agent)" as H
 participant "swarm-tail\n(CLI)" as Tail
-participant "Context bridge" as BR
-participant "Goal provider" as GP
-participant "Context manager" as CM
-participant "Provider limits" as Lim
+participant "Bridge\n(M3)" as BR
+participant "Goal provider\n(scheduler)" as GP
+participant "Session host\n(goal ledger, admission)" as SH
+participant "Context Engine\n(M2)" as CE
+participant "Capacity\n(S3)" as Cap
 participant "Matrix provider" as MP
 
-H -> Tail: swarm-tail goal set "make tests green"\n--until "go test ./... passes" ~--max-nudges 10
+H -> Tail: swarm-tail goal set "make tests green"\n~--until "go test ./... passes" ~--max-nudges 10
 Tail -> BR: tail{goal.set} + session token
-BR -> BR: check token scope (own session)
-BR -> GP: tail{binding_id, goal.set}
-GP -> CM: store goal state = active (author=agent)
-GP --> Tail: ok
-note right of GP
-  Agent-set goal stays agent_authored:
+BR -> BR: token scope: this execution, own bindings;\ngoal and park need no mandate
+BR -> SH: goal.set (namespace agent)
+SH -> SH: admit(); author = this session's agent (caller-derived);\nCAS rev 0 -> 1
+SH --> BR: ok{goal_id, rev 1}
+BR --> Tail: ok
+note right of SH
+  Agent-set goal stays agent_authored,
   never operator authority. Goals never
   go into argv or the system prompt.
 end note
 
 loop while goal active
-  H -> CM: turn.completed
-  CM -> BR: observe(turn.completed, state=idle)
-  BR -> GP: output{event}
-  GP -> GP: progress check (tool calls, output changed?)
-  alt adapter state blocked:permission
-    GP -> BR: ask (permission prompt) to #X-system
-    note right of GP: not counted as no progress
-  else no progress twice or max nudges reached
-    GP -> CM: goal state = blocked / exhausted
-    GP -> BR: notice (goal stalled)
-    BR -> MP: output to #X-system
+  H -> CE: turn.completed
+  CE -> BR: observe(turn.completed, state=idle)
+  BR -> GP: output{binding_handle, event}
+  GP -> BR: goal.get(goal_id)
+  BR -> SH: goal.get
+  SH --> BR: active, rev 1, nudges 3
+  BR --> GP: goal state
+  GP -> GP: no-progress detector (shadow): record would_block only
+  alt max nudges reached
+    GP -> BR: goal.delivery_update(exhausted)
+    BR -> SH: ledger: state exhausted (CAS)
+    BR -> MP: notice (goal exhausted) to #X-system
   else budget available
-    GP -> Lim: acquire(nudge budget)
-    Lim --> GP: lease
-    GP -> BR: envelope{kind=nudge, host_authored frame,\ngoal text marked agent_authored}
-    BR -> CM: inject(nudge, lane=next_turn)
-    CM -> H: stdin: "Goal: make tests green. Continue.\nDone: swarm-tail goal clear ~--done\nBlocked: swarm-tail goal clear ~--blocked <reason>"
+    GP -> Cap: acquire(nudge budget)
+    Cap --> GP: lease
+    GP -> BR: nudge request (goal_id, rev)
+    BR -> SH: enqueue(nudge: host_authored frame,\ngoal text labelled agent_authored)
+    SH -> CE: dispatch at next turn boundary
+    CE -> H: stdin: "Your own goal: make tests green. Continue.\nDone: swarm-tail goal clear ~--done\nBlocked: swarm-tail goal clear ~--blocked <reason>"
     H -> H: works a turn
   end
 end
+note over CE, GP
+  Permission prompts are interaction.pending events,
+  handled outside this loop (plugins-and-interactions.md).
+  While one is pending the goal does not nudge or count turns.
+end note
 
 alt agent finished
   H -> Tail: swarm-tail goal clear ~--done
   Tail -> BR: tail{goal.clear done}
-  BR -> GP: tail{goal.clear}
-  GP -> CM: goal state = done
-  GP -> BR: notice (goal done)
-  BR -> MP: output to thread
+  BR -> SH: goal.clear (CAS rev 1 -> 2, state done)
+  BR -> MP: notice (goal done) to thread
 else agent blocked
   H -> Tail: swarm-tail goal clear ~--blocked "needs owner decision"
   Tail -> BR: tail{goal.clear blocked}
-  BR -> GP: tail{goal.clear}
-  GP -> CM: goal state = blocked
-  BR -> MP: output to #X-system (ask)
+  BR -> SH: goal.clear (state blocked)
+  BR -> MP: ask to #X-system
 end
 @enduml

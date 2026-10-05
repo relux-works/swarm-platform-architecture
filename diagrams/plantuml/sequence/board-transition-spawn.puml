@@ -1,72 +1,76 @@
 @startuml board-transition-spawn
 !theme plain
-title Board transition -> flow engine -> role router -> spawn via the launcher -> session + I/O and goal bindings
+title Board transition -> proposal -> kernel guard -> intent -> role router -> spawn with an idempotent key -> goal revision published
 
 actor "Orchestrator or person" as Act
 participant "B2 Flow engine" as FE
-database "B1 Task store" as TS
+database "B1 Task store\n(+ kguard)" as TS
 participant "B3 Role router" as RR
 participant "Product registry\n(S4)" as Reg
 participant "B4 Spawn" as SP
 participant "Launcher\n(thin client)" as L
-participant "Composer\n(curator-run)" as C
-participant "Provider limits\n(S3 = B6)" as Lim
-participant "Session manager\n(M1)" as SM
-participant "Context manager\n(M2)" as CM
-participant "Context bridge\n(M3)" as BR
-participant "B5 Board provider" as BP
-participant "Goal provider" as GP
+participant "Session host\n(M1 + M2, ledger)" as SH
+participant "Bridge\n(M3)" as BR
+participant "B5 Board goal\nbinding" as BP
+participant "Goal provider\n(scheduler)" as GP
 participant "Worker\n(harness)" as W
 
 Act -> FE: transition(TASK-42, to=development, actor)
-FE -> TS: get(TASK-42) (type=task, status=to-dev, fields, rev)
-FE -> FE: version in force (flow_digest D7):\nworkflow leaf, transition * -> development
-FE -> FE: guards: blockers.clear, estimate, assignee;\nfresh evidence; limit counters
-alt a guard fails
+FE -> TS: get(TASK-42) (type=task, status=to-dev, rev 7)
+FE -> FE: version in force D7, generation g12:\nguards blockers.clear, estimate, assignee; limit
+alt a configurable guard fails
   FE --> Act: refused (guard, reason)
 else guards pass
-  FE -> TS: write_status(TASK-42, to-dev -> development,\nactor, flow_digest=D7, rev)
-  TS --> FE: record ok (rev+1)
-  FE -> RR: flow.entered{TASK-42, development,\nowner=developer, actions=[spawn.owner], D7}
-  RR -> Reg: binding(X/repo).role_bindings[developer]
-  Reg --> RR: none (spawn), target local,\nrooms #X-repo
-  RR -> RR: role developer = skill dev-developer + data/role.json\n(needs, definition of done) + role profile
-  RR -> SP: spawn(LaunchRequest{profile developer, mode headless,\nhosted-stream:codex-app-server, task_class code,\nio matrix:#X-repo/thread-new, context slice:<orch ref>?,\ngoal: board, parent orch, board_ref{TASK-42, development, D7}})
-  SP -> L: launch(LaunchRequest)
-  L -> Lim: acquire(provider slot)
-  Lim --> L: lease
-  L -> C: compose-only(launch intent)
-  C --> L: plan + lock_sha256 + fragment digest
-  L -> SM: ax start ~--launch-plan - (policy=no-restart, lifetime)
-  SM -> W: exec under holder
-  SM -> CM: channel(worker) duplex
-  CM -> W: open adapter
-  opt context slice
-    L -> CM: restore(slice, worker, rebuild)
+  FE -> TS: write_status(proposal: to-dev -> development,\nexpected rev 7, generation g12)
+  TS -> TS: kguard: kernel-policy/1 predicates K1-K8\n(same transaction, whatever the flow says)
+  alt kernel predicate fails, or rev / generation changed
+    TS --> FE: refused{K<n>} or stale (re-evaluate)
+    FE --> Act: refused
+  else commit
+    TS -> TS: status record (flow_digest D7, g12) +\nTransitionIntent{intent_id, actions=[spawn.owner]}
+    TS --> FE: ok (rev 8)
+    FE -> RR: flow.entered{TASK-42, development, owner=developer, D7}
+    RR -> Reg: binding(X/repo).role_bindings[developer]
+    Reg --> RR: no standing session; role profile + pin; target local
+    RR -> SP: spawn(LaunchRequest{request_id = (board, TASK-42, rev 8, action 0),\nprofile developer, expect_pin, binding X/repo rev,\nhosted-stream:codex-app-server, goal = board revision ref,\nboard_ref{TASK-42, development, D7, g12}})
+    SP -> L: launch(LaunchRequest)
+    note right of L
+      Launch transaction as in worker-start;
+      board_ref never reaches the composer.
+      Same request_id = same result.
+    end note
+    L -> SH: intake, start, initialize
+    SH -> W: exec under holder
+    L -> BR: bind(worker, matrix thread), bind(worker, board)
+    SH --> L: ready
+    L --> SP: LaunchResult{logical_session_id, plan_digest, profile_pin, effective}
+    SP -> TS: attach RUN-981 (profile_pin, plan_digest, binding_digest,\ncredential_mode, project_context_mode); intent done
+    TS -> TS: goal.revise TASK-42 (goal_id G42, rev 1, until = exit guards)
+    BP -> BR: goal.publish{G42, rev 1, digest, RUN-981, session} (board identity)
+    BR -> SH: ledger: delivery record for (G42, rev 1)
+    GP -> BR: schedules nudges for (G42, rev 1); bridge calls host enqueue
   end
-  L -> BR: bind(worker, matrix thread in #X-repo)
-  L -> BR: bind(worker, board, {TASK-42, development})
-  BR -> BP: bind{binding_id, element, state}
-  SM --> L: session_id
-  L --> SP: {session_id, plan_digest}
-  SP -> TS: attach(TASK-42, RUN-981 -> session_id, lock_sha256)
-  BP -> BR: goal set (author=board, until = exit guards\nof development: outcome.present, checklist)
-  BR -> GP: goal.set for the session
-  GP -> CM: goal state active; first nudge at next idle
 end
 
 == Completion ==
 W -> W: works; writes outcome via task-board
-W -> BR: swarm-tail goal clear ~--done
-BR -> GP: goal done
-GP -> BP: goal outcome done (TASK-42)
-BP -> FE: transition(TASK-42, to=testing,\nactor=run RUN-981, own_element)
-FE -> FE: evaluate under the version in force now;\nrole still admitted?
+W -> BR: swarm-tail goal clear ~--done (board slot)
+BR -> SH: delivery record: pending_acceptance (nudges paused)
+BR -> BP: goal.outcome proposal{G42, rev 1, done, evidence}
+BP -> FE: transition(TASK-42, to=testing, actor=run RUN-981, own_element)
+FE -> FE: evaluate under the version in force now (generation check)
 alt version changed and state no longer admits the role
   FE --> BP: refused (stale run); root orchestrator owns the element
-else guards pass
-  FE -> TS: write_status(development -> testing)
+  BP -> BR: notice to the orchestrator; delivery record back to active
+else kguard and guards pass
+  FE -> TS: write_status(development -> testing) + intent
+  TS --> BP: accepted: goal G42 rev 1 closed
+  BP -> BR: close delivery record
   FE -> RR: flow.entered{testing, owner=tester}
   note right of RR: next owner spawns the same way
 end
+note over W, BP
+  goal clear ~--blocked, or a no-progress result, becomes
+  a notice to the orchestrator or a person, never a transition.
+end note
 @enduml

@@ -1,38 +1,76 @@
 @startuml controlled-restart
 !theme plain
-title Controlled restart: park, drain, snapshot, re-check the pin, restart, resume
+title Controlled restart: persisted fence -> drain -> park -> confirmed absence -> eligibility -> start -> reconcile -> release (contracts/restart-and-takeover.md)
 
 actor "Operator" as Op
-participant "Session manager" as SM
-participant "Context bridge" as BR
-participant "Context manager" as CM
-participant "Harness" as H
+participant "Session host\n(M1 supervisor)" as SH
+database "Host store\n(fences, inbox, journal)" as HS
+participant "Context Engine\n(M2, host package)" as CE
+participant "Holder +\nold harness" as H1
+participant "Bridge\n(M3)" as BR
 participant "Composer\n(curator-run)" as C
-database "Context store" as JS
+database "B1 Task store\n(board sessions)" as B1
+participant "Holder +\nnew harness" as H2
 
-Op -> SM: restart(session, controlled)
-SM -> BR: close admission for session
-BR -> BR: new envelopes held in provider mailboxes
-SM -> CM: park(session)
-CM -> H: inject host notice: "write park note via swarm-tail park"
-alt agent writes park note in time
-  H -> CM: swarm-tail park "<note>" (via bridge)
-else timeout
-  CM -> CM: generate summary from journal
+Op -> SH: restart(session, controlled), signed control envelope
+SH -> SH: admit(control.restart): grant, target, fence state
+SH -> HS: fence.close(op_id, reason=restart), fsync
+note right of HS
+  Serialized with start, wake, retry, probe.
+  Enqueue still persists (queued);
+  nothing is dispatched while closed.
+end note
+
+== Drain ==
+SH -> CE: stop dispatch; wait for turn boundary
+CE -> CE: void pending interactions
+SH -> SH: process group has no tool children?\nexternal effects settled? (kernel locks, build lock, CR ops)
+alt drain timeout or effect still in flight
+  SH --> Op: restart_aborted{drain}; old execution keeps running;\nfence stays closed until the operator decides
+else drained
+  == Park ==
+  CE -> H1: host notice: write a park note (swarm-tail park)
+  alt note in time
+    H1 -> BR: swarm-tail park "<note>" (agent_authored)
+    BR -> CE: park note via typed API
+  else timeout
+    CE -> CE: summary from the journal
+  end
+  CE -> HS: HandoffPackage (swarm-handoff/2) at watermark H
+  opt board session
+    SH -> B1: commit goal revision with handoff_ref (CAS)
+    B1 --> SH: committed revision (ready evidence)
+  end
+
+  == Stop with confirmed absence ==
+  SH -> H1: SIGTERM process group, wait, SIGKILL
+  H1 --> SH: exit status; process group empty;\nnative session lock released
+  alt absence not confirmed
+    SH --> Op: stop_unconfirmed; no replacement; fence stays closed
+  else absent
+    == Eligibility ==
+    SH -> C: compare-only (profile_pin, fragment digest, system-modules)
+    C --> SH: current digests (no plan)
+    SH -> SH: compare stored plan pins, effective posture,\nbinding rev, grants, auth readiness, runtime probe
+    alt any mismatch or failure
+      SH -> HS: session state parked_refused{reason}; fence stays closed
+      SH --> Op: refused{reason}. Path ends: no rebind, no delivery.\nAccepting drift is a new operation that rebuilds
+    else eligible
+      SH -> H2: exec stored immutable plan (ax resume of the record),\nnew generation, new session token
+      SH -> CE: initialize: native resume (same home, pin, transcript)
+      CE -> H2: native resume
+      CE -> H2: readiness probe
+      alt init or readiness fails
+        SH -> H2: compensate: stop, confirm absence
+        SH --> Op: init_failed; fence stays closed
+      else ready
+        SH -> CE: reconcile unknown deliveries (input markers);\nhistorical approvals void
+        SH -> HS: fence.open(op_id), fsync
+        CE -> H2: dispatch queued items in order
+        CE -> BR: receipts dispatched / applied
+        SH --> Op: restart report (op_id, handoff_ref, applied, pending, unknown)
+      end
+    end
+  end
 end
-CM -> JS: handoff package (reason=refresh)
-CM --> SM: handoff_ref
-SM -> H: stop
-SM -> C: re-resolve profile pin (compose-only)
-C --> SM: plan, lock_sha256, fragment digest
-alt drift
-  SM --> Op: refused (drift); accept to rebuild
-else pin unchanged (same managed home)
-  SM -> H: exec with the re-composed plan
-  SM -> CM: restore(handoff_ref, preserve)
-  CM -> H: native resume
-end
-SM -> BR: open admission
-BR -> CM: deliver held envelopes
-SM --> Op: restart report (handoff_ref, delivered, pending)
 @enduml
