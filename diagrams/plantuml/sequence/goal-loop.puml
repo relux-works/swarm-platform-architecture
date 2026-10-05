@@ -14,22 +14,30 @@ H -> Tail: swarm-tail goal set "make tests green"\n--until "go test ./... passes
 Tail -> BR: tail{goal.set} + session token
 BR -> BR: check token scope (own session)
 BR -> GP: tail{binding_id, goal.set}
-GP -> CM: store goal state = active
+GP -> CM: store goal state = active (author=agent)
 GP --> Tail: ok
+note right of GP
+  Agent-set goal stays agent_authored:
+  never operator authority. Goals never
+  go into argv or the system prompt.
+end note
 
 loop while goal active
   H -> CM: turn.completed
   CM -> BR: observe(turn.completed, state=idle)
   BR -> GP: output{event}
   GP -> GP: progress check (tool calls, output changed?)
-  alt no progress twice or max nudges reached
+  alt adapter state blocked:permission
+    GP -> BR: ask (permission prompt) to #X-system
+    note right of GP: not counted as no progress
+  else no progress twice or max nudges reached
     GP -> CM: goal state = blocked / exhausted
     GP -> BR: notice (goal stalled)
     BR -> MP: output to #X-system
   else budget available
     GP -> Lim: acquire(nudge budget)
     Lim --> GP: lease
-    GP -> BR: envelope{kind=nudge, host_authored}
+    GP -> BR: envelope{kind=nudge, host_authored frame,\ngoal text marked agent_authored}
     BR -> CM: inject(nudge, lane=next_turn)
     CM -> H: stdin: "Goal: make tests green. Continue.\nDone: swarm-tail goal clear ~--done\nBlocked: swarm-tail goal clear ~--blocked <reason>"
     H -> H: works a turn

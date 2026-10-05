@@ -1,19 +1,21 @@
 @startuml worker-start
 !theme plain
-title Worker start: an orchestrator spawns a headless worker via the launcher
+title Worker start: an orchestrator spawns a headless worker (launcher composes only; M1 execs and holds)
 
 participant "Project orchestrator\n(harness)" as O
-participant "Launcher" as L
+participant "Launcher\n(swarm launch, thin client)" as L
 participant "Model router" as MR
 participant "Provider limits" as Lim
+participant "Composer\n(curator-run + agents-management)" as C
+participant "Environment\n(Curator)" as Env
+participant "Session manager\n(M1)" as SM
 participant "Context manager" as CM
-participant "Session manager" as SM
 participant "Context bridge" as BR
 participant "Matrix provider" as MP
 participant "Worker\n(harness)" as W
 database "Matrix (a2a)" as MX
 
-O -> L: swarm launch ~--manifest developer ~--mode headless\n--parent <orch> ~--project X/repo [--context slice:...]\n--io matrix:#X-repo/thread-new
+O -> L: swarm launch ~--profile developer ~--mode headless\n~--transport hosted-stream:codex-app-server\n~--parent <orch> ~--project X/repo [~--context slice:...]\n~--io matrix:#X-repo/thread-new ~--goal "<task>"
 L -> MR: route(task_class, difficulty)
 MR --> L: runtime, model, effort
 L -> Lim: acquire(slot)
@@ -24,23 +26,39 @@ else slot granted
   Lim --> L: lease
 end
 
+L -> C: compose-only(launch intent: profile, env, runtime,\nmodel/effort, mode, hosted-stream, permissions?)
+C -> Env: env resolve <env> ~--profile developer ~--format json
+Env --> C: fragment (tool home, lock_sha256, instructions,\nskills, MCP, command_environment)
+C -> C: agents-management plan\n(HostedStream mode; one construction site)
+C --> L: Decision 0013 plan + lock_sha256 + fragment digest
+note right of C
+  No goal in argv or system prompt.
+  Permissions: silence = native;
+  tracked yolo refused until a
+  versioned ax capability exists.
+end note
+
 opt context slice requested
   L -> CM: snapshot(orch, slice(selector))
-  CM --> L: handoff package (summary, goal, open items)
+  CM --> L: handoff package (summary, goal, open items;\nlock_sha256 + fragment digest; no secrets)
 end
 
-L -> SM: start(plan, policy=no-restart, lifetime)
-SM -> W: spawn headless (claude -p stream-json / codex app-server)
-SM -> CM: channel(worker)
+L -> SM: ax start <name> ~--launch-plan - ~--workspace <cwd>\n(policy=no-restart, lifetime, lease)
+SM -> SM: store plan, lock_sha256, fragment digest
+SM -> W: exec under holder (process group, abort fence)
+SM -> CM: channel(worker) duplex (ax capability)
+CM -> W: open adapter codex-app-server
+SM --> L: session_id
 opt slice present
   L -> CM: restore(slice, worker, rebuild)
+  note right of CM: different managed home,\nso always rebuild
   CM -> W: first framed turn: summary + goal + open items
 end
 
 L -> BR: bind(worker, matrix, thread in #X-repo)
-BR -> MP: bind{binding_id, room, thread}
+BR -> MP: bind{binding_id, room, thread, secret_ref}
 MP -> MX: create thread / pin room
-L -> BR: bind(worker, goal, goal=task)
+L -> BR: bind(worker, goal, text="<task>", author=launcher)
 
 L --> O: session_id, binding (thread)
 
@@ -50,6 +68,7 @@ CM -> BR: observe
 BR -> MP: output{binding_id, event}
 MP -> MX: post to thread
 W -> CM: turn.completed + exit
+SM -> SM: classify exit
 CM -> SM: exited
 SM -> Lim: release(lease)
 MP -> MX: post result summary

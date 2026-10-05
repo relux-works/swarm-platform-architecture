@@ -16,9 +16,9 @@ left to right direction
 
 Person(Owner, "Owner", $descr="Sets direction, signs mandates, talks to keepers in product spaces", $tags="", $link="")
 Person(Cofounderoperator, "Co-founder / operator", $descr="Runs nodes, reviews architecture, attaches to sessions", $tags="", $link="")
+System(SwarmPlatform, "Swarm Platform", $descr="Holds agent sessions, wraps their I/O, launches local and remote agents", $tags="", $link="")
 System(MatrixHomeservera2a, "Matrix Homeserver (a2a)", $descr="Spaces, rooms and threads; a2a mailbox and identities", $tags="", $link="")
 System(ModelProviders, "Model Providers", $descr="Anthropic, OpenAI, local inference-manager endpoints", $tags="", $link="")
-System(SwarmPlatform, "Swarm Platform", $descr="Holds agent sessions, wraps their I/O, launches local and remote agents", $tags="", $link="")
 System(RemoteHost, "Remote Host", $descr="Mac mini with subscriptions, runs the remote harness side", $tags="", $link="")
 System(GitRepositories, "Git Repositories", $descr="One repo per project", $tags="", $link="")
 

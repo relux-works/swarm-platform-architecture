@@ -1,9 +1,10 @@
 @startuml keeper-start
 !theme plain
-title Product keeper start (launcher + session manager + context bridge with a Matrix provider)
+title Product keeper start (thin launcher + composer + session manager intake + context bridge with a Matrix provider)
 
 actor "Operator" as Op
-participant "Launcher" as L
+participant "Launcher\n(thin client)" as L
+participant "Composer\n(curator-run)" as C
 participant "Environment\n(Curator)" as Env
 participant "Product registry" as Reg
 participant "Provider limits" as Lim
@@ -15,21 +16,24 @@ participant "Goal provider" as GP
 participant "Harness\n(X_keeper)" as H
 database "Matrix (a2a)" as MX
 
-Op -> L: swarm launch ~--manifest product-keeper\n--project X ~--mode interactive
+Op -> L: swarm launch ~--profile product-keeper\n~--project X ~--mode interactive
 L -> Reg: binding(X)
 Reg --> L: product dir, rooms #X-lobby #X-broadcast #X-system
-L -> Env: env resolve product-keeper ~--format json
-Env --> L: launch-env fragment (tool home, instructions, skills, MCP)
-note right of L
-  Tool home relocated
-  (CLAUDE_CONFIG_DIR / CODEX_HOME);
-  auth kept by symlink or token
-end note
 L -> Lim: acquire(provider slot)
 Lim --> L: lease
-L -> L: build plan (agents-management,\none construction site)
-L -> SM: start(plan, policy=always-restart)
-SM -> H: spawn under holder
+L -> C: compose-only(profile product-keeper, interactive)
+C -> Env: env resolve <env> ~--profile product-keeper ~--format json
+Env --> C: launch-env fragment (tool home, lock_sha256,\ninstructions, skills, MCP, command_environment)
+note right of Env
+  Tool home only (CLAUDE_CONFIG_DIR /
+  CODEX_HOME / XDG); HOME kept.
+  Claude: one /login per managed home,
+  or CIP-0003 token once adopted
+end note
+C -> C: agents-management plan\n(one construction site)
+C --> L: plan + lock_sha256 + fragment digest
+L -> SM: ax start X_keeper ~--launch-plan - (policy=always-restart)
+SM -> H: exec under holder
 SM -> CM: channel(session) granted
 CM -> H: open adapter (stream-json / app-server)
 SM --> L: session_id
@@ -47,8 +51,13 @@ L -> BR: bind(session, goal)
 BR -> GP: bind{binding_id}
 
 opt a handoff package exists for X_keeper
-  L -> CM: restore(handoff, session, preserve)
-  CM -> H: resume native session or prime first turn
+  alt same runtime, same managed home, same lock_sha256 + fragment digest
+    L -> CM: restore(handoff, session, preserve)
+    CM -> H: native resume, replay undelivered envelopes
+  else pin or home differs
+    L -> CM: restore(handoff, session, rebuild)
+    CM -> H: first framed turn: summary + goal + open items
+  end
 end
 
 L --> Op: session_id, attach hint

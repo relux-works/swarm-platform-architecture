@@ -1,0 +1,72 @@
+@startuml board-transition-spawn
+!theme plain
+title Board transition -> flow engine -> role router -> spawn via the launcher -> session + I/O and goal bindings
+
+actor "Orchestrator or person" as Act
+participant "B2 Flow engine" as FE
+database "B1 Task store" as TS
+participant "B3 Role router" as RR
+participant "Product registry\n(S4)" as Reg
+participant "B4 Spawn" as SP
+participant "Launcher\n(thin client)" as L
+participant "Composer\n(curator-run)" as C
+participant "Provider limits\n(S3 = B6)" as Lim
+participant "Session manager\n(M1)" as SM
+participant "Context manager\n(M2)" as CM
+participant "Context bridge\n(M3)" as BR
+participant "B5 Board provider" as BP
+participant "Goal provider" as GP
+participant "Worker\n(harness)" as W
+
+Act -> FE: transition(TASK-42, to=development, actor)
+FE -> TS: get(TASK-42) (type=task, status=to-dev, fields, rev)
+FE -> FE: version in force (flow_digest D7):\nworkflow leaf, transition * -> development
+FE -> FE: guards: blockers.clear, estimate, assignee;\nfresh evidence; limit counters
+alt a guard fails
+  FE --> Act: refused (guard, reason)
+else guards pass
+  FE -> TS: write_status(TASK-42, to-dev -> development,\nactor, flow_digest=D7, rev)
+  TS --> FE: record ok (rev+1)
+  FE -> RR: flow.entered{TASK-42, development,\nowner=developer, actions=[spawn.owner], D7}
+  RR -> Reg: binding(X/repo).role_bindings[developer]
+  Reg --> RR: none (spawn), target local,\nrooms #X-repo
+  RR -> RR: role developer = skill dev-developer + data/role.json\n(needs, definition of done) + role profile
+  RR -> SP: spawn(LaunchRequest{profile developer, mode headless,\nhosted-stream:codex-app-server, task_class code,\nio matrix:#X-repo/thread-new, context slice:<orch ref>?,\ngoal: board, parent orch, board_ref{TASK-42, development, D7}})
+  SP -> L: launch(LaunchRequest)
+  L -> Lim: acquire(provider slot)
+  Lim --> L: lease
+  L -> C: compose-only(launch intent)
+  C --> L: plan + lock_sha256 + fragment digest
+  L -> SM: ax start ~--launch-plan - (policy=no-restart, lifetime)
+  SM -> W: exec under holder
+  SM -> CM: channel(worker) duplex
+  CM -> W: open adapter
+  opt context slice
+    L -> CM: restore(slice, worker, rebuild)
+  end
+  L -> BR: bind(worker, matrix thread in #X-repo)
+  L -> BR: bind(worker, board, {TASK-42, development})
+  BR -> BP: bind{binding_id, element, state}
+  SM --> L: session_id
+  L --> SP: {session_id, plan_digest}
+  SP -> TS: attach(TASK-42, RUN-981 -> session_id, lock_sha256)
+  BP -> BR: goal set (author=board, until = exit guards\nof development: outcome.present, checklist)
+  BR -> GP: goal.set for the session
+  GP -> CM: goal state active; first nudge at next idle
+end
+
+== Completion ==
+W -> W: works; writes outcome via task-board
+W -> BR: swarm-tail goal clear ~--done
+BR -> GP: goal done
+GP -> BP: goal outcome done (TASK-42)
+BP -> FE: transition(TASK-42, to=testing,\nactor=run RUN-981, own_element)
+FE -> FE: evaluate under the version in force now;\nrole still admitted?
+alt version changed and state no longer admits the role
+  FE --> BP: refused (stale run); root orchestrator owns the element
+else guards pass
+  FE -> TS: write_status(development -> testing)
+  FE -> RR: flow.entered{testing, owner=tester}
+  note right of RR: next owner spawns the same way
+end
+@enduml

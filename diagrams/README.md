@@ -7,11 +7,11 @@ diagrams/
 ├── c4/                          # Structurizr DSL (C4)
 │   ├── workspace.dsl            # minimal entrypoint, !include only
 │   ├── model/01-people.dsl      # owner, operator
-│   ├── model/02-systems.dsl     # platform, containers, context-manager components, externals
+│   ├── model/02-systems.dsl     # platform, containers, context-manager and board components, externals
 │   ├── model/99-relationships.dsl
 │   ├── views/context.dsl        # SystemContext
 │   ├── views/containers.dsl     # Containers
-│   ├── views/components.dsl     # ContextManagerComponents (manager, bridge, providers)
+│   ├── views/components.dsl     # ContextManagerComponents, BoardComponents (B1-B6)
 │   └── styles/styles.dsl
 ├── plantuml/sequence/           # one scenario per file
 │   ├── keeper-start.puml
@@ -20,11 +20,13 @@ diagrams/
 │   ├── matrix-message-injection.puml
 │   ├── goal-loop.puml
 │   ├── context-takeover.puml
-│   └── controlled-restart.puml
+│   ├── controlled-restart.puml
+│   ├── board-transition-spawn.puml  # status transition -> flow engine -> role router -> spawn
+│   └── flow-config-load.puml        # Playbook validation, activation, flow version pinning
 └── artefacts/                   # generated output (not committed yet)
 ```
 
-Elements tagged `Future` (board plugin, board provider) are placeholders and render dashed.
+Elements tagged `Plugin` (delivery module, B5 board provider) render with a dashed border. The launcher is split into a thin client and the composer (curator-run + agents-management) per VISION v1 D2. The board flow example is `vision/flows/swarm-project.Playbook.json`.
 
 ## Render
 

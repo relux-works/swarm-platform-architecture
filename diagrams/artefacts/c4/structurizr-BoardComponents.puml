@@ -1,0 +1,66 @@
+@startuml
+title <size:24>Component View: Swarm Platform - Board (flow plugin)</size>\n<size:24>Board parts B1-B6: task store, flow config and engine, role router, spawn, board goal binding, validation and limits</size>
+
+set separator none
+left to right direction
+
+<style>
+  root {
+    BackgroundColor: #ffffff
+    FontColor: #444444
+  }
+</style>
+
+!include <C4/C4>
+!include <C4/C4_Context>
+!include <C4/C4_Container>
+!include <C4/C4_Component>
+
+System(GitRepositories, "Git Repositories", $descr="One repo per project", $tags="", $link="")
+
+System_Boundary("SwarmPlatform_boundary", "Swarm Platform", $tags="") {
+  Container_Boundary("SwarmPlatform.Boardflowplugin_boundary", "Board (flow plugin)", $tags="") {
+    ComponentDb(SwarmPlatform.Boardflowplugin.B1TaskStore, "B1 Task Store", $techn="task-board pkg/board records", $descr="Elements, hierarchy, status records, resources (outcomes, RUN-* handles, handoff refs), activity; no flow knowledge", $tags="", $link="")
+    Component(SwarmPlatform.Boardflowplugin.B2FlowConfigandEngine, "B2 Flow Config and Engine", $techn="curator-playbook kernel seam", $descr="Loads and validates Playbook.json, keeps the version in force, evaluates transitions with guards and limits, pins flow_digest per record", $tags="", $link="")
+    Component(SwarmPlatform.Boardflowplugin.DeliveryModule, "Delivery Module", $techn="B2 module plugin", $descr="Guards, actions and events for development: CRs, accept_cr, integration, check sets", $tags="", $link="")
+    Component(SwarmPlatform.Boardflowplugin.B3RoleRouter, "B3 Role Router", $techn="Go", $descr="Resolves the owner role of (type, state) to a role profile and a LaunchRequest, a standing session, a human notice, a tool or a process", $tags="", $link="")
+    Component(SwarmPlatform.Boardflowplugin.B4Spawn, "B4 Spawn", $techn="Go client of M4", $descr="One spawn interface: interactive or headless, local or remote, through the launcher; records RUN-* handles; never execs", $tags="", $link="")
+    Component(SwarmPlatform.Boardflowplugin.B5BoardGoalBinding, "B5 Board Goal Binding", $techn="M3 provider plugin", $descr="Board provider: publishes element goals to sessions through the goal provider, maps goal outcomes to transition requests, notifies human owners, keeps handoff refs", $tags="", $link="")
+    Component(SwarmPlatform.Boardflowplugin.B6ValidationandLimits, "B6 Validation and Limits", $techn="S3 client", $descr="Spawn slots and the validation FIFO; the board side of the S3 platform service", $tags="", $link="")
+  }
+
+  Container(SwarmPlatform.Trust, "Trust", $techn="mandate CLI + library", $descr="Mandates, curator-trust grants, capability tokens", $tags="", $link="")
+  Container(SwarmPlatform.ProviderLimits, "Provider Limits", $techn="extracted from task-board", $descr="Host semaphore, rate limits, validation FIFO for check sets (board part B6)", $tags="", $link="")
+  Container(SwarmPlatform.ProductRegistryKeeper, "Product Registry / Keeper", $techn="curator-keeper registry", $descr="Products, projects, project bindings (hosts, rooms, role bindings), keeper processes, up after reboot", $tags="", $link="")
+  Container(SwarmPlatform.EnvironmentManager, "Environment Manager", $techn="Curator + skill-registry", $descr="Role profiles, skills, MCP, command environment, managed tool homes, launch-env fragments (v3, then v4); curator playbook check", $tags="", $link="")
+  Container(SwarmPlatform.Launcherthinclient, "Launcher (thin client)", $techn="Go CLI (swarm launch)", $descr="Turns a LaunchRequest into a launch intent: route, network, limits slot, project binding; gets one plan from the composer, hands it to M1 or M6, binds I/O and context. Never reads a fragment, spells a flag, execs or holds", $tags="", $link="")
+  Container(SwarmPlatform.ContextManagerandBridge, "Context Manager and Bridge", $techn="Go library in the holder + bridge process", $descr="Wraps agent stdin/stdout, keeps the unified context, hosts in/out provider plugins behind a trust gate", $tags="", $link="")
+}
+
+Rel(SwarmPlatform.Boardflowplugin.B2FlowConfigandEngine, SwarmPlatform.EnvironmentManager, "Validates and resolves templates and role skills", $techn="curator playbook check", $tags="", $link="")
+Rel(SwarmPlatform.Boardflowplugin.B2FlowConfigandEngine, SwarmPlatform.Trust, "Asks whether a version is confirmed or covered", $techn="confirmed/granted/narrowed", $tags="", $link="")
+Rel(SwarmPlatform.Boardflowplugin.B2FlowConfigandEngine, SwarmPlatform.Boardflowplugin.B1TaskStore, "Writes status records with flow_digest", $techn="write_status(rev)", $tags="", $link="")
+Rel(SwarmPlatform.Boardflowplugin.B2FlowConfigandEngine, SwarmPlatform.Boardflowplugin.DeliveryModule, "Evaluates module guards and actions", $techn="guard/action/event", $tags="", $link="")
+Rel(SwarmPlatform.Boardflowplugin.B2FlowConfigandEngine, SwarmPlatform.Boardflowplugin.B3RoleRouter, "Entered a state with spawn.owner", $techn="flow.entered", $tags="", $link="")
+Rel(SwarmPlatform.Boardflowplugin.B3RoleRouter, SwarmPlatform.ProductRegistryKeeper, "Reads role bindings to standing sessions", $techn="binding()", $tags="", $link="")
+Rel(SwarmPlatform.Boardflowplugin.B3RoleRouter, SwarmPlatform.Boardflowplugin.B4Spawn, "Agent owner: LaunchRequest", $techn="spawn()", $tags="", $link="")
+Rel(SwarmPlatform.Boardflowplugin.B3RoleRouter, SwarmPlatform.Boardflowplugin.B5BoardGoalBinding, "Standing owner or human owner: goal or notice", $techn="publish()", $tags="", $link="")
+Rel(SwarmPlatform.Boardflowplugin.B4Spawn, SwarmPlatform.Launcherthinclient, "Launches the role", $techn="launch(LaunchRequest)", $tags="", $link="")
+Rel(SwarmPlatform.Boardflowplugin.B4Spawn, SwarmPlatform.Boardflowplugin.B1TaskStore, "Records RUN-* handle", $techn="attach()", $tags="", $link="")
+Rel(SwarmPlatform.Boardflowplugin.B5BoardGoalBinding, SwarmPlatform.Boardflowplugin.B2FlowConfigandEngine, "Goal done or blocked: transition request", $techn="transition(actor=run)", $tags="", $link="")
+Rel(SwarmPlatform.Boardflowplugin.B5BoardGoalBinding, SwarmPlatform.Boardflowplugin.B1TaskStore, "Stores handoff refs and notices", $techn="attach/append", $tags="", $link="")
+Rel(SwarmPlatform.Boardflowplugin.DeliveryModule, SwarmPlatform.Boardflowplugin.B6ValidationandLimits, "Queues check sets", $techn="queue()", $tags="", $link="")
+Rel(SwarmPlatform.Boardflowplugin.B6ValidationandLimits, SwarmPlatform.ProviderLimits, "Slots and validation FIFO", $techn="acquire/queue", $tags="", $link="")
+Rel(SwarmPlatform.Boardflowplugin.DeliveryModule, GitRepositories, "Integrates accepted revisions", $techn="git", $tags="", $link="")
+Rel(SwarmPlatform.Launcherthinclient, SwarmPlatform.ProviderLimits, "Acquires a slot", $techn="acquire/release", $tags="", $link="")
+Rel(SwarmPlatform.Launcherthinclient, SwarmPlatform.ProductRegistryKeeper, "Reads project binding", $techn="binding()", $tags="", $link="")
+Rel(SwarmPlatform.Launcherthinclient, SwarmPlatform.ContextManagerandBridge, "Binds I/O providers and the goal", $techn="bind()", $tags="", $link="")
+Rel(SwarmPlatform.Launcherthinclient, SwarmPlatform.Trust, "Consumes mandate for privileged steps", $techn="mandate consume", $tags="", $link="")
+Rel(SwarmPlatform.ContextManagerandBridge, SwarmPlatform.Trust, "Verifies signatures, grants, mandates", $techn="verify/granted", $tags="", $link="")
+Rel(SwarmPlatform.ContextManagerandBridge, SwarmPlatform.Boardflowplugin.B5BoardGoalBinding, "bind/output/tail", $techn="JSONL", $tags="", $link="")
+Rel(SwarmPlatform.ContextManagerandBridge, SwarmPlatform.ProviderLimits, "Checks nudge budget", $techn="acquire()", $tags="", $link="")
+Rel(SwarmPlatform.Boardflowplugin.B2FlowConfigandEngine, GitRepositories, "Reads Playbook.json at the default-branch head", $techn="git", $tags="", $link="")
+
+SHOW_LEGEND(true)
+hide stereotypes
+@enduml

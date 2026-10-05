@@ -1,9 +1,10 @@
 @startuml context-takeover
 !theme plain
-title Context takeover: crash or reboot -> restore from the unified context -> resume in a new session
+title Context takeover: crash or reboot -> re-check the pin -> restore from the unified context in a new session
 
 participant "Product registry\n(keeper up)" as Reg
 participant "Session manager" as SM
+participant "Composer\n(curator-run)" as C
 participant "Context manager" as CM
 database "Journal and\ncontext store" as JS
 participant "Context bridge" as BR
@@ -15,7 +16,7 @@ alt harness crash
   H1 -> SM: process exited (non-zero)
   SM -> CM: snapshot(session, reason=crash)
   CM -> JS: read journal tail, goal, bindings, cursors
-  CM -> JS: write handoff package (signed)
+  CM -> JS: write handoff package (signed;\nlock_sha256 + fragment digest, no secrets)
 else host reboot
   Reg -> SM: up() after login
   SM -> JS: list last handoff per registered session
@@ -25,14 +26,19 @@ else host reboot
   end note
 end
 
-SM -> SM: load stored plan by hash\n(flags never rebuilt)
-SM -> H2: start new holder + harness
-SM -> CM: channel(new session)
-
-alt same runtime and transcript valid
-  CM -> H2: preserve: native resume (session id)
-else other runtime or transcript lost
-  CM -> H2: rebuild: first framed turn =\nsummary + goal + open items + events tail
+SM -> C: re-resolve profile pin (compose-only)
+C --> SM: plan, lock_sha256, fragment digest
+alt drift against the handoff pin
+  SM -> SM: refuse by default (event refused_drift)
+  SM -> BR: notice "drift: operator must accept (forces rebuild)"
+else pin unchanged, or drift accepted by the operator
+  SM -> H2: exec new holder + harness (intake plan)
+  SM -> CM: channel(new session)
+  alt same runtime, same managed home, pin unchanged, transcript valid
+    CM -> H2: preserve: native resume (session id)
+  else other profile or runtime, drift accepted, or transcript lost
+    CM -> H2: rebuild: first framed turn =\nsummary + goal + open items + events tail
+  end
 end
 
 CM -> BR: rebind io_bindings with saved cursors

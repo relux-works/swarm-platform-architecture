@@ -1,12 +1,13 @@
 @startuml controlled-restart
 !theme plain
-title Controlled restart: park, drain, snapshot, restart with the same plan, resume
+title Controlled restart: park, drain, snapshot, re-check the pin, restart, resume
 
 actor "Operator" as Op
 participant "Session manager" as SM
 participant "Context bridge" as BR
 participant "Context manager" as CM
 participant "Harness" as H
+participant "Composer\n(curator-run)" as C
 database "Context store" as JS
 
 Op -> SM: restart(session, controlled)
@@ -22,9 +23,15 @@ end
 CM -> JS: handoff package (reason=refresh)
 CM --> SM: handoff_ref
 SM -> H: stop
-SM -> H: start with stored plan (hash)
-SM -> CM: restore(handoff_ref, preserve)
-CM -> H: resume
+SM -> C: re-resolve profile pin (compose-only)
+C --> SM: plan, lock_sha256, fragment digest
+alt drift
+  SM --> Op: refused (drift); accept to rebuild
+else pin unchanged (same managed home)
+  SM -> H: exec with the re-composed plan
+  SM -> CM: restore(handoff_ref, preserve)
+  CM -> H: native resume
+end
 SM -> BR: open admission
 BR -> CM: deliver held envelopes
 SM --> Op: restart report (handoff_ref, delivered, pending)

@@ -1,6 +1,6 @@
 @startuml remote-worker-start
 !theme plain
-title Remote worker start: launcher -> rwh -> remote host, project attachment
+title Remote worker start: launcher -> rwh -> remote host, project attachment (launch intent; bundle derived from lock_sha256)
 
 participant "Orchestrator" as O
 participant "Launcher" as L
@@ -12,7 +12,7 @@ participant "Remote host\n(Mac mini)" as RH
 participant "Context manager" as CM
 participant "Context bridge" as BR
 
-O -> L: swarm launch ~--manifest developer\n--target remote:macmini ~--project X/repo ~--mode headless
+O -> L: swarm launch ~--profile developer\n--target remote:macmini ~--project X/repo ~--mode headless
 L -> Reg: binding(X/repo)
 Reg --> L: repo, landed ref, allowed hosts,\njail project, rooms, allow_from
 
@@ -23,7 +23,15 @@ else allowed
     L -> T: mandate consume (remote attach)
     T --> L: verdict ok
   end
-  L -> L: render manifest to bundle.json\n(role, task, goals, inlined skills, workspace)
+  alt target: target host resolves Curator itself (preferred)
+    L -> R: launch intent {profile, env, lock_sha256, task, io}
+    note right of R
+      Target host runs its own Curator
+      composer; no second composer here
+    end note
+  else interim: rwh bundle
+    L -> L: derive bundle.json from the profile lock (lock_sha256):\nrole, task, inlined skills, workspace; goal kept out of the prompt
+  end
   alt one-shot
     L -> R: rwh run ~--bundle DIR ~--out DIR ~--backend jail
   else standing
@@ -32,9 +40,10 @@ else allowed
   R -> J: provision(project, git bundle of landed ref)
   R -> RH: ssh, scratch tool home, harness turn
   note right of RH
-    Remote side: empty HOME,
-    tokens from authowner,
-    built-in tools off
+    Remote side: empty HOME is an executor
+    sandbox property (not a profile field);
+    built-in tools off. CIP-0003 token/helper
+    refused until protected lookup exists
   end note
   loop each tool call
     RH -> R: tool call (bash, read_file, write_file, apply_patch)
