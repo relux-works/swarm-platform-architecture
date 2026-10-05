@@ -1,0 +1,31 @@
+@startuml controlled-restart
+!theme plain
+title Controlled restart: park, drain, snapshot, restart with the same plan, resume
+
+actor "Operator" as Op
+participant "Session manager" as SM
+participant "Context bridge" as BR
+participant "Context manager" as CM
+participant "Harness" as H
+database "Context store" as JS
+
+Op -> SM: restart(session, controlled)
+SM -> BR: close admission for session
+BR -> BR: new envelopes held in provider mailboxes
+SM -> CM: park(session)
+CM -> H: inject host notice: "write park note via swarm-tail park"
+alt agent writes park note in time
+  H -> CM: swarm-tail park "<note>" (via bridge)
+else timeout
+  CM -> CM: generate summary from journal
+end
+CM -> JS: handoff package (reason=refresh)
+CM --> SM: handoff_ref
+SM -> H: stop
+SM -> H: start with stored plan (hash)
+SM -> CM: restore(handoff_ref, preserve)
+CM -> H: resume
+SM -> BR: open admission
+BR -> CM: deliver held envelopes
+SM --> Op: restart report (handoff_ref, delivered, pending)
+@enduml

@@ -1,0 +1,49 @@
+@startuml context-takeover
+!theme plain
+title Context takeover: crash or reboot -> restore from the unified context -> resume in a new session
+
+participant "Product registry\n(keeper up)" as Reg
+participant "Session manager" as SM
+participant "Context manager" as CM
+database "Journal and\ncontext store" as JS
+participant "Context bridge" as BR
+participant "Matrix provider" as MP
+participant "Old harness" as H1
+participant "New harness" as H2
+
+alt harness crash
+  H1 -> SM: process exited (non-zero)
+  SM -> CM: snapshot(session, reason=crash)
+  CM -> JS: read journal tail, goal, bindings, cursors
+  CM -> JS: write handoff package (signed)
+else host reboot
+  Reg -> SM: up() after login
+  SM -> JS: list last handoff per registered session
+  note right of JS
+    Last periodic snapshot or park note;
+    events after it come from the journal
+  end note
+end
+
+SM -> SM: load stored plan by hash\n(flags never rebuilt)
+SM -> H2: start new holder + harness
+SM -> CM: channel(new session)
+
+alt same runtime and transcript valid
+  CM -> H2: preserve: native resume (session id)
+else other runtime or transcript lost
+  CM -> H2: rebuild: first framed turn =\nsummary + goal + open items + events tail
+end
+
+CM -> BR: rebind io_bindings with saved cursors
+BR -> MP: bind{binding_id, cursor}
+MP -> MP: replay undelivered envelopes since cursor
+MP -> BR: envelopes (dedupe by id)
+BR -> CM: inject at next turn boundary
+CM -> H2: pending messages
+opt goal was active
+  CM -> H2: goal nudge resumes (goal provider)
+end
+SM -> BR: notice session.restored
+BR -> MP: post "restored from handoff" to #X-system
+@enduml

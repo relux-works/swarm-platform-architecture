@@ -1,0 +1,50 @@
+@startuml matrix-message-injection
+!theme plain
+title Matrix message -> in-provider -> trust gate -> stdin injection -> output -> out-provider
+
+database "Matrix (a2a)" as MX
+participant "Matrix provider" as MP
+participant "Context bridge" as BR
+participant "Trust gate" as TG
+participant "Trust\n(mandates, grants)" as T
+participant "Context manager" as CM
+participant "Harness" as H
+
+MX -> MP: new event in #X-repo (sync)
+MP -> MP: persist to mailbox, advance cursor
+MP -> BR: envelope{id, channel, sender, signature?, body}
+BR -> TG: verify(envelope)
+TG -> T: signature, pinned identity,\ngrant/mandate scope
+T --> TG: result
+TG -> TG: freshness / replay,\ndeterministic checks
+
+alt reject
+  TG --> BR: reject
+  BR -> MP: receipt{id, rejected}
+else operator-signed
+  TG --> BR: authoritative
+  BR -> CM: inject(envelope, lane=next_turn) as user turn
+else peer or unsigned
+  TG --> BR: untrusted
+  BR -> CM: inject(framed as UNTRUSTED PEER EVENTS data)
+end
+
+alt session idle
+  CM -> H: write turn to stdin (adapter)
+  CM --> BR: receipt delivered
+else session working
+  CM -> CM: queue until turn boundary
+  CM --> BR: receipt queued
+else blocked or unknown state
+  CM --> BR: receipt refused (park, notify)
+end
+BR -> MP: receipt{id, status}
+MP -> MX: ack (mailbox receipt)
+
+== Output ==
+H -> CM: stdout events (text, tool calls, turn.completed)
+CM -> CM: journal append
+CM -> BR: observe(OutputEvent)
+BR -> MP: output{binding_id, event}
+MP -> MX: post reply in the same thread
+@enduml

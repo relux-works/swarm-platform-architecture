@@ -1,0 +1,55 @@
+@startuml keeper-start
+!theme plain
+title Product keeper start (launcher + session manager + context bridge with a Matrix provider)
+
+actor "Operator" as Op
+participant "Launcher" as L
+participant "Environment\n(Curator)" as Env
+participant "Product registry" as Reg
+participant "Provider limits" as Lim
+participant "Session manager" as SM
+participant "Context manager" as CM
+participant "Context bridge" as BR
+participant "Matrix provider" as MP
+participant "Goal provider" as GP
+participant "Harness\n(X_keeper)" as H
+database "Matrix (a2a)" as MX
+
+Op -> L: swarm launch ~--manifest product-keeper\n--project X ~--mode interactive
+L -> Reg: binding(X)
+Reg --> L: product dir, rooms #X-lobby #X-broadcast #X-system
+L -> Env: env resolve product-keeper ~--format json
+Env --> L: launch-env fragment (tool home, instructions, skills, MCP)
+note right of L
+  Tool home relocated
+  (CLAUDE_CONFIG_DIR / CODEX_HOME);
+  auth kept by symlink or token
+end note
+L -> Lim: acquire(provider slot)
+Lim --> L: lease
+L -> L: build plan (agents-management,\none construction site)
+L -> SM: start(plan, policy=always-restart)
+SM -> H: spawn under holder
+SM -> CM: channel(session) granted
+CM -> H: open adapter (stream-json / app-server)
+SM --> L: session_id
+
+== I/O bindings ==
+L -> BR: bind(session, matrix, rooms X-*)
+BR -> MP: bind{binding_id, config, secret_ref}
+opt identity X_keeper does not exist yet
+  L -> L: mandate consume (identity ensure)
+  MP -> MX: identity ensure (under mandate)
+end
+MP -> MX: join and subscribe rooms
+MP --> BR: manifest + cursor
+L -> BR: bind(session, goal)
+BR -> GP: bind{binding_id}
+
+opt a handoff package exists for X_keeper
+  L -> CM: restore(handoff, session, preserve)
+  CM -> H: resume native session or prime first turn
+end
+
+L --> Op: session_id, attach hint
+@enduml

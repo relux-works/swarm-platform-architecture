@@ -1,0 +1,53 @@
+@startuml goal-loop
+!theme plain
+title Goal loop (smart Ralph loop): the agent sets its own goal, the goal provider nudges via stdin
+
+participant "Harness\n(agent)" as H
+participant "swarm-tail\n(CLI)" as Tail
+participant "Context bridge" as BR
+participant "Goal provider" as GP
+participant "Context manager" as CM
+participant "Provider limits" as Lim
+participant "Matrix provider" as MP
+
+H -> Tail: swarm-tail goal set "make tests green"\n--until "go test ./... passes" ~--max-nudges 10
+Tail -> BR: tail{goal.set} + session token
+BR -> BR: check token scope (own session)
+BR -> GP: tail{binding_id, goal.set}
+GP -> CM: store goal state = active
+GP --> Tail: ok
+
+loop while goal active
+  H -> CM: turn.completed
+  CM -> BR: observe(turn.completed, state=idle)
+  BR -> GP: output{event}
+  GP -> GP: progress check (tool calls, output changed?)
+  alt no progress twice or max nudges reached
+    GP -> CM: goal state = blocked / exhausted
+    GP -> BR: notice (goal stalled)
+    BR -> MP: output to #X-system
+  else budget available
+    GP -> Lim: acquire(nudge budget)
+    Lim --> GP: lease
+    GP -> BR: envelope{kind=nudge, host_authored}
+    BR -> CM: inject(nudge, lane=next_turn)
+    CM -> H: stdin: "Goal: make tests green. Continue.\nDone: swarm-tail goal clear ~--done\nBlocked: swarm-tail goal clear ~--blocked <reason>"
+    H -> H: works a turn
+  end
+end
+
+alt agent finished
+  H -> Tail: swarm-tail goal clear ~--done
+  Tail -> BR: tail{goal.clear done}
+  BR -> GP: tail{goal.clear}
+  GP -> CM: goal state = done
+  GP -> BR: notice (goal done)
+  BR -> MP: output to thread
+else agent blocked
+  H -> Tail: swarm-tail goal clear ~--blocked "needs owner decision"
+  Tail -> BR: tail{goal.clear blocked}
+  BR -> GP: tail{goal.clear}
+  GP -> CM: goal state = blocked
+  BR -> MP: output to #X-system (ask)
+end
+@enduml

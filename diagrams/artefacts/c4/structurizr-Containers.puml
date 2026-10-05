@@ -1,0 +1,74 @@
+@startuml
+title <size:24>Container View: Swarm Platform</size>\n<size:24>Platform modules and supporting services</size>
+
+set separator none
+left to right direction
+
+<style>
+  root {
+    BackgroundColor: #ffffff
+    FontColor: #444444
+  }
+</style>
+
+!include <C4/C4>
+!include <C4/C4_Context>
+!include <C4/C4_Container>
+
+Person(Owner, "Owner", $descr="Sets direction, signs mandates, talks to keepers in product spaces", $tags="", $link="")
+Person(Cofounderoperator, "Co-founder / operator", $descr="Runs nodes, reviews architecture, attaches to sessions", $tags="", $link="")
+System(MatrixHomeservera2a, "Matrix Homeserver (a2a)", $descr="Spaces, rooms and threads; a2a mailbox and identities", $tags="", $link="")
+System(ModelProviders, "Model Providers", $descr="Anthropic, OpenAI, local inference-manager endpoints", $tags="", $link="")
+System(RemoteHost, "Remote Host", $descr="Mac mini with subscriptions, runs the remote harness side", $tags="", $link="")
+System(GitRepositories, "Git Repositories", $descr="One repo per project", $tags="", $link="")
+
+System_Boundary("SwarmPlatform_boundary", "Swarm Platform", $tags="") {
+  Container(SwarmPlatform.AgentHarnessSession, "Agent Harness Session", $techn="Native CLI", $descr="Claude Code, Codex, Muse or Pi process with a relocated tool home", $tags="", $link="")
+  Container(SwarmPlatform.Trust, "Trust", $techn="mandate CLI + library", $descr="Mandates, curator-trust grants, capability tokens", $tags="", $link="")
+  Container(SwarmPlatform.RemoteHarness, "Remote Harness", $techn="rwh", $descr="Runs a harness on another host, tools local and jailed", $tags="", $link="")
+  Container(SwarmPlatform.WorkerJail, "Worker Jail", $techn="worker-jail + colima", $descr="One hardened container per tool call, patches out", $tags="", $link="")
+  Container(SwarmPlatform.ModelRouter, "Model Router", $techn="curator-model-router", $descr="Runtime, model and effort per task class", $tags="", $link="")
+  Container(SwarmPlatform.NetworkProfiles, "Network Profiles", $techn="curator-network-profiles", $descr="Egress profiles and conformance probe", $tags="", $link="")
+  Container(SwarmPlatform.ProviderLimits, "Provider Limits", $techn="extracted from task-board", $descr="Host semaphore, rate limits, validation FIFO", $tags="", $link="")
+  Container(SwarmPlatform.ProductRegistryKeeper, "Product Registry / Keeper", $techn="curator-keeper registry", $descr="Products, projects, project bindings, keeper processes, up after reboot", $tags="", $link="")
+  Container(SwarmPlatform.EnvironmentManager, "Environment Manager", $techn="Curator + skill-registry", $descr="Profiles, skills, MCP, managed tool homes, launch-env fragments", $tags="", $link="")
+  Container(SwarmPlatform.BoardPluginfuture, "Board Plugin (future)", $techn="placeholder", $descr="Flow config (Playbook.json) + task management + spawn through the launcher", $tags="", $link="")
+  Container(SwarmPlatform.Launcher, "Launcher", $techn="Go CLI (swarm launch) over Curator + agents-management", $descr="Turns a LaunchRequest into a running session: manifest, tool home, model route, limits slot, one plan, local or remote target", $tags="", $link="")
+  Container(SwarmPlatform.SessionManager, "Session Manager", $techn="agent-session-host core (now: tb-sessiond)", $descr="Holds harness processes alive: start, stop, park, restart, reboot restore; no content", $tags="", $link="")
+  Container(SwarmPlatform.ContextManagerandBridge, "Context Manager and Bridge", $techn="Go library in the holder + bridge process", $descr="Wraps agent stdin/stdout, keeps the unified context, hosts in/out provider plugins behind a trust gate", $tags="", $link="")
+}
+
+Rel(Owner, MatrixHomeservera2a, "Talks to keepers in product spaces", $techn="", $tags="", $link="")
+Rel(Owner, SwarmPlatform.Trust, "Signs mandates and grants", $techn="mandate CLI", $tags="", $link="")
+Rel(Cofounderoperator, SwarmPlatform.Launcher, "Launches keepers and orchestrators", $techn="swarm launch", $tags="", $link="")
+Rel(Cofounderoperator, SwarmPlatform.SessionManager, "Lists, attaches, parks, restarts", $techn="CLI", $tags="", $link="")
+Rel(SwarmPlatform.Launcher, SwarmPlatform.EnvironmentManager, "Resolves manifest into launch-env fragment", $techn="env resolve JSON", $tags="", $link="")
+Rel(SwarmPlatform.Launcher, SwarmPlatform.ModelRouter, "Routes model and effort", $techn="route()", $tags="", $link="")
+Rel(SwarmPlatform.Launcher, SwarmPlatform.NetworkProfiles, "Resolves egress profile", $techn="resolve()", $tags="", $link="")
+Rel(SwarmPlatform.Launcher, SwarmPlatform.ProviderLimits, "Acquires a slot", $techn="acquire/release", $tags="", $link="")
+Rel(SwarmPlatform.Launcher, SwarmPlatform.ProductRegistryKeeper, "Reads project binding", $techn="binding()", $tags="", $link="")
+Rel(SwarmPlatform.Launcher, SwarmPlatform.SessionManager, "Starts local session from plan", $techn="start(plan, policy)", $tags="", $link="")
+Rel(SwarmPlatform.Launcher, SwarmPlatform.RemoteHarness, "Starts remote session", $techn="rwh run / rwh worker", $tags="", $link="")
+Rel(SwarmPlatform.Launcher, SwarmPlatform.ContextManagerandBridge, "Binds I/O providers", $techn="bind()", $tags="", $link="")
+Rel(SwarmPlatform.Launcher, SwarmPlatform.Trust, "Consumes mandate for privileged steps", $techn="mandate consume", $tags="", $link="")
+Rel(SwarmPlatform.SessionManager, SwarmPlatform.AgentHarnessSession, "Holds process alive", $techn="PTY / pipes", $tags="", $link="")
+Rel(SwarmPlatform.SessionManager, SwarmPlatform.ContextManagerandBridge, "Grants I/O channel, asks for snapshot on park", $techn="channel(), snapshot()", $tags="", $link="")
+Rel(SwarmPlatform.ProductRegistryKeeper, SwarmPlatform.SessionManager, "Restores node after reboot", $techn="up() -> resume()", $tags="", $link="")
+Rel(SwarmPlatform.ContextManagerandBridge, SwarmPlatform.AgentHarnessSession, "Turn input and output", $techn="stream-json / app-server / PTY", $tags="", $link="")
+Rel(SwarmPlatform.ContextManagerandBridge, SwarmPlatform.Trust, "Verifies signatures, grants, mandates", $techn="verify/granted", $tags="", $link="")
+Rel(SwarmPlatform.AgentHarnessSession, SwarmPlatform.ContextManagerandBridge, "Agent runs tail commands", $techn="shell tool", $tags="", $link="")
+Rel(SwarmPlatform.ContextManagerandBridge, MatrixHomeservera2a, "Subscribes and posts", $techn="a2a / Matrix CS API", $tags="", $link="")
+Rel(SwarmPlatform.ContextManagerandBridge, SwarmPlatform.ProviderLimits, "Checks nudge budget", $techn="acquire()", $tags="", $link="")
+Rel(SwarmPlatform.AgentHarnessSession, ModelProviders, "Model calls", $techn="HTTPS", $tags="", $link="")
+Rel(SwarmPlatform.AgentHarnessSession, GitRepositories, "Works in project repo", $techn="git", $tags="", $link="")
+Rel(SwarmPlatform.RemoteHarness, RemoteHost, "Runs remote harness turns", $techn="ssh + unix sockets", $tags="", $link="")
+Rel(SwarmPlatform.RemoteHarness, SwarmPlatform.WorkerJail, "Runs tool calls", $techn="worker-jail run", $tags="", $link="")
+Rel(SwarmPlatform.RemoteHarness, SwarmPlatform.ContextManagerandBridge, "Relays turns and output", $techn="adapter over rwh", $tags="", $link="")
+Rel(SwarmPlatform.WorkerJail, GitRepositories, "Seeds from landed ref, exports patch", $techn="git bundle", $tags="", $link="")
+Rel(RemoteHost, ModelProviders, "Model calls on remote subscriptions", $techn="HTTPS", $tags="", $link="")
+Rel(SwarmPlatform.ModelRouter, ModelProviders, "Knows provider capabilities", $techn="catalog", $tags="", $link="")
+Rel(SwarmPlatform.BoardPluginfuture, SwarmPlatform.Launcher, "Spawn intent on status transition", $techn="launch()", $tags="", $link="")
+
+SHOW_LEGEND(true)
+hide stereotypes
+@enduml

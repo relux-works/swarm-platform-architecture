@@ -1,0 +1,56 @@
+@startuml remote-worker-start
+!theme plain
+title Remote worker start: launcher -> rwh -> remote host, project attachment
+
+participant "Orchestrator" as O
+participant "Launcher" as L
+participant "Product registry" as Reg
+participant "Trust\n(mandates)" as T
+participant "rwh (local)" as R
+participant "Worker jail" as J
+participant "Remote host\n(Mac mini)" as RH
+participant "Context manager" as CM
+participant "Context bridge" as BR
+
+O -> L: swarm launch ~--manifest developer\n--target remote:macmini ~--project X/repo ~--mode headless
+L -> Reg: binding(X/repo)
+Reg --> L: repo, landed ref, allowed hosts,\njail project, rooms, allow_from
+
+alt host not allowed for project
+  L --> O: refused (binding)
+else allowed
+  opt first attach of this project to the host
+    L -> T: mandate consume (remote attach)
+    T --> L: verdict ok
+  end
+  L -> L: render manifest to bundle.json\n(role, task, goals, inlined skills, workspace)
+  alt one-shot
+    L -> R: rwh run ~--bundle DIR ~--out DIR ~--backend jail
+  else standing
+    L -> R: rwh worker ~--project ~--jail-project ~--room ~--allow-from
+  end
+  R -> J: provision(project, git bundle of landed ref)
+  R -> RH: ssh, scratch tool home, harness turn
+  note right of RH
+    Remote side: empty HOME,
+    tokens from authowner,
+    built-in tools off
+  end note
+  loop each tool call
+    RH -> R: tool call (bash, read_file, write_file, apply_patch)
+    R -> J: run in fresh container
+    J --> R: stdout, exit
+    R --> RH: tool result
+  end
+  R -> CM: relay turn output (rwh adapter)
+  CM -> BR: observe -> out providers
+  RH --> R: turn done
+  R -> J: export patch
+  R --> L: report.json, patch, calls.jsonl
+  alt needs_input (exit 75)
+    L --> O: questions[]; re-run with answers
+  else done
+    L --> O: patch + report for review
+  end
+end
+@enduml
