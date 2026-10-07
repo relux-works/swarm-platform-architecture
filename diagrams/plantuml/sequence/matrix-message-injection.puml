@@ -1,50 +1,71 @@
 @startuml matrix-message-injection
 !theme plain
-title Matrix message -> in-provider -> trust gate -> stdin injection -> output -> out-provider
+title Matrix message -> provider mailbox -> bridge admission -> durable host enqueue -> dispatch -> applied; output through an audience projection
 
 database "Matrix (a2a)" as MX
-participant "Matrix provider" as MP
-participant "Context bridge" as BR
-participant "Trust gate" as TG
-participant "Trust\n(mandates, grants)" as T
-participant "Context manager" as CM
+participant "Matrix provider\n(child process)" as MP
+participant "Bridge\n(M3)" as BR
+database "Bridge store\n(id claims, mailbox,\noutbox, audit)" as BS
+participant "Trust\n(curator-trust, mandates)" as T
+participant "Session host\n(admission, inbox)" as SH
+participant "Context Engine\n(dispatcher)" as CE
 participant "Harness" as H
 
 MX -> MP: new event in #X-repo (sync)
-MP -> MP: persist to mailbox, advance cursor
-MP -> BR: envelope{id, channel, sender, signature?, body}
-BR -> TG: verify(envelope)
-TG -> T: signature, pinned identity,\ngrant/mandate scope
-T --> TG: result
-TG -> TG: freshness / replay,\ndeterministic checks
+MP -> MP: persist to mailbox (fsync), then advance carrier cursor
+MP -> BR: envelope{binding_handle, swarm-envelope/2 bytes}
+BR -> BR: principal from handle + verified carrier identity\n(claimed_sender is data only)
+BR -> T: exact-byte signature, enrolled key,\ngrant for action on target, revocation
+T --> BR: result
 
-alt reject
-  TG --> BR: reject
-  BR -> MP: receipt{id, rejected}
-else operator-signed
-  TG --> BR: authoritative
-  BR -> CM: inject(envelope, lane=next_turn) as user turn
-else peer or unsigned
-  TG --> BR: untrusted
-  BR -> CM: inject(framed as UNTRUSTED PEER EVENTS data)
+BR -> BS: atomic: claim (principal, id) -> body_sha256,\nverdict, admission record
+alt same id, same hash
+  BR -> MP: existing receipt (duplicate)
+else same id, other hash / reflection / expired / wrong target
+  BR -> BS: audit
+  BR -> MP: receipt refused{reason}
+else unsigned
+  BR -> BS: quarantine: body stays in the mailbox
+  BR -> SH: enqueue(doorbell: channel, claimed sender, ids)
+else signed peer
+  BR -> SH: enqueue(data, UNTRUSTED PEER EVENTS frame)
+else operator-signed user_turn
+  BR -> SH: enqueue(user_turn, authoritative)
 end
 
-alt session idle
-  CM -> H: write turn to stdin (adapter)
-  CM --> BR: receipt delivered
-else session working
-  CM -> CM: queue until turn boundary
-  CM --> BR: receipt queued
-else blocked or unknown state
-  CM --> BR: receipt refused (park, notify)
+SH -> SH: admit(): bridge identity, grant, expiry,\nbinding rev; idem_key dedupe
+alt storage failure or refused
+  SH --> BR: refused{storage or reason}
+  BR -> MP: receipt refused
+else persisted (fsync)
+  SH --> BR: ack{host_seq}
+  BR -> MP: receipt queued
 end
-BR -> MP: receipt{id, status}
+
+== Dispatch (fence open, turn boundary) ==
+CE -> SH: admit() again: revocation, expiry, fence, readiness
+alt session idle and ready
+  CE -> H: write input with input_marker (adapter)
+  CE -> SH: dispatched{host_seq, execution_id}
+  H --> CE: adapter echo of input_marker
+  CE -> SH: applied
+else working
+  CE -> CE: wait for the turn boundary (or native steer)
+else interaction pending, human lease held, or unknown state
+  CE -> CE: hold (queued); unknown parks
+else holder died after dispatch
+  CE -> SH: unknown: reconcile before any replay
+end
+SH -> BR: staged receipt (dispatched / applied / refused / expired / unknown)
+BR -> MP: receipt{id, state}
 MP -> MX: ack (mailbox receipt)
 
 == Output ==
-H -> CM: stdout events (text, tool calls, turn.completed)
-CM -> CM: journal append
-CM -> BR: observe(OutputEvent)
-BR -> MP: output{binding_id, event}
+H -> CE: events (text, tool calls, turn.completed)
+CE -> CE: journal append (host store)
+CE -> BR: observe(OutputEvent)
+BR -> BR: audience projection: final_text by default;\ntool calls only with a transcript grant
+BR -> BS: outbox item (origin id kept for reflection checks)
+BR -> MP: output{binding_handle, projected event}
 MP -> MX: post reply in the same thread
 @enduml

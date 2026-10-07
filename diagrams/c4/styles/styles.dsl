@@ -26,6 +26,9 @@ styles {
   element "Store" {
     shape cylinder
   }
+  element "Plugin" {
+    border dashed
+  }
   element "Future" {
     border dashed
     opacity 60

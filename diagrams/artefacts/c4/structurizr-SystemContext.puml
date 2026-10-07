@@ -16,20 +16,20 @@ left to right direction
 
 Person(Owner, "Owner", $descr="Sets direction, signs mandates, talks to keepers in product spaces", $tags="", $link="")
 Person(Cofounderoperator, "Co-founder / operator", $descr="Runs nodes, reviews architecture, attaches to sessions", $tags="", $link="")
+System(SwarmPlatform, "Swarm Platform", $descr="Holds agent sessions, wraps their I/O, launches local and remote agents", $tags="", $link="")
 System(MatrixHomeservera2a, "Matrix Homeserver (a2a)", $descr="Spaces, rooms and threads; a2a mailbox and identities", $tags="", $link="")
 System(ModelProviders, "Model Providers", $descr="Anthropic, OpenAI, local inference-manager endpoints", $tags="", $link="")
-System(SwarmPlatform, "Swarm Platform", $descr="Holds agent sessions, wraps their I/O, launches local and remote agents", $tags="", $link="")
 System(RemoteHost, "Remote Host", $descr="Mac mini with subscriptions, runs the remote harness side", $tags="", $link="")
 System(GitRepositories, "Git Repositories", $descr="One repo per project", $tags="", $link="")
 
-Rel(Owner, MatrixHomeservera2a, "Talks to keepers in product spaces", $techn="", $tags="", $link="")
-Rel(Owner, SwarmPlatform, "Signs mandates and grants", $techn="mandate CLI", $tags="", $link="")
-Rel(Cofounderoperator, SwarmPlatform, "Launches keepers and orchestrators", $techn="swarm launch", $tags="", $link="")
 Rel(SwarmPlatform, MatrixHomeservera2a, "Subscribes and posts", $techn="a2a / Matrix CS API", $tags="", $link="")
 Rel(SwarmPlatform, ModelProviders, "Model calls", $techn="HTTPS", $tags="", $link="")
 Rel(SwarmPlatform, GitRepositories, "Works in project repo", $techn="git", $tags="", $link="")
-Rel(SwarmPlatform, RemoteHost, "Runs remote harness turns", $techn="ssh + unix sockets", $tags="", $link="")
+Rel(SwarmPlatform, RemoteHost, "Target curator-run composes and refuses on pin mismatch; harness turns", $techn="ssh + unix sockets", $tags="", $link="")
 Rel(RemoteHost, ModelProviders, "Model calls on remote subscriptions", $techn="HTTPS", $tags="", $link="")
+Rel(Owner, MatrixHomeservera2a, "Talks to keepers in product spaces", $techn="", $tags="", $link="")
+Rel(Owner, SwarmPlatform, "Signs mandates, grants and authoritative envelopes", $techn="mandate CLI", $tags="", $link="")
+Rel(Cofounderoperator, SwarmPlatform, "Launches keepers and orchestrators", $techn="curator run", $tags="", $link="")
 
 SHOW_LEGEND(true)
 hide stereotypes

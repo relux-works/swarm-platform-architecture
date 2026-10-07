@@ -1,56 +1,97 @@
 @startuml worker-start
 !theme plain
-title Worker start: an orchestrator spawns a headless worker via the launcher
+title Worker start: launch transaction (prepare, capacity, compose, admit, start, initialize, ready); launcher composes only, the session host execs and holds
 
 participant "Project orchestrator\n(harness)" as O
-participant "Launcher" as L
+participant "Launcher\n(curator run, thin client)" as L
+participant "Product registry\n(S4)" as Reg
 participant "Model router" as MR
-participant "Provider limits" as Lim
-participant "Context manager" as CM
-participant "Session manager" as SM
-participant "Context bridge" as BR
+participant "Capacity\n(S3)" as Cap
+participant "Composer\n(curator-run + agents-management)" as C
+participant "Environment\n(Curator)" as Env
+participant "Session host\n(M1 + M2)" as SH
+participant "Bridge\n(M3)" as BR
 participant "Matrix provider" as MP
 participant "Worker\n(harness)" as W
 database "Matrix (a2a)" as MX
 
-O -> L: swarm launch ~--manifest developer ~--mode headless\n--parent <orch> ~--project X/repo [--context slice:...]\n--io matrix:#X-repo/thread-new
-L -> MR: route(task_class, difficulty)
-MR --> L: runtime, model, effort
-L -> Lim: acquire(slot)
-alt no slot
-  Lim --> L: queued
-  L --> O: queued (handle)
-else slot granted
-  Lim --> L: lease
+O -> L: launch, LaunchRequest JSON on stdin:\n{request_id, profile developer, expect_pin, env, mode headless,\ntransport hosted-stream:codex-app-server, binding X/repo rev,\ntask_class, io matrix thread-new, continuity seeded:<pkg>?,\ngoal{text, until}, parent}
+note right of L
+  No goal in argv: swarm launch has
+  no goal flag; the goal is a payload.
+  runtime is not a field: env decides it.
+end note
+
+== prepare ==
+L -> Reg: binding(X/repo, rev)
+Reg --> L: binding digest, hosts, base policy, egress, audiences
+L -> MR: route(task_class)
+MR --> L: model, effort
+
+== capacity ==
+L -> Cap: admit_host(local, job_class)
+alt gate refused (disk, cpu_idle, build_lock, syspolicyd) or no slot
+  Cap --> L: refused{gate} or queued{handle}
+  L --> O: LaunchResult queued / refused{capacity:gate}
+  note right of L: the path stops here
+else lease
+  Cap --> L: lease
+
+  == compose ==
+  L -> C: compose-only(launch intent: profile, env, model/effort,\nmode, hosted-stream, permissions?)
+  C -> Env: env resolve <env> ~--profile developer ~--format json
+  Env --> C: fragment (tool home, profile pin, instructions,\nskills, MCP, command_environment)
+  C -> C: agents-management plan: HostedStream mode;\nsession_start frames spell the permission posture
+  C --> L: Decision 0013 plan + profile_pin + fragment digest
+  alt profile_pin differs from expect_pin
+    L -> Cap: release(lease)
+    L --> O: refused{pin_mismatch} (no process exists)
+  else pin matches
+
+    == admit ==
+    L -> SH: intake (ax start ~--launch-plan contract, strict mode),\nrequest_id, binding pin, lease
+    SH -> SH: hosted-stream/1 capability? binding and gates rechecked;\nfence created closed
+    alt capability unavailable
+      SH --> L: refused{capability_unavailable} before any process exists
+      L -> Cap: release(lease)
+      L --> O: LaunchResult refused
+    else admitted
+
+      == start ==
+      SH -> Cap: transfer(lease, host)
+      SH -> W: exec under a holder (process group, abort fence);\ncredential source_ref resolved here
+      SH -> W: forward session_start frames verbatim; open adapter
+
+      == initialize ==
+      L -> BR: bind(worker, matrix, thread in #X-repo, audience)
+      BR -> MP: bind{binding_handle, room, thread}
+      MP -> MX: create thread
+      opt continuity seeded
+        SH -> SH: seed import: audience, pins, goal refs, items re-authorized
+        SH -> W: first framed turn (summary, decisions, open items)
+      end
+      L -> SH: goal.set via ledger (author = launcher, from the caller)
+      SH -> SH: issue session token; readiness probe
+      alt bind, seed or readiness fails
+        SH -> W: compensate: unbind, stop, confirm absence, release lease
+        SH --> L: failed{stage}
+        L --> O: LaunchResult failed{stage}
+      else ready
+        SH -> SH: fence open
+        SH --> L: ready{logical_session_id, execution_id}
+        L --> O: LaunchResult{plan_digest, profile_pin, binding_digest,\neffective posture, assurance T}
+      end
+    end
+  end
 end
-
-opt context slice requested
-  L -> CM: snapshot(orch, slice(selector))
-  CM --> L: handoff package (summary, goal, open items)
-end
-
-L -> SM: start(plan, policy=no-restart, lifetime)
-SM -> W: spawn headless (claude -p stream-json / codex app-server)
-SM -> CM: channel(worker)
-opt slice present
-  L -> CM: restore(slice, worker, rebuild)
-  CM -> W: first framed turn: summary + goal + open items
-end
-
-L -> BR: bind(worker, matrix, thread in #X-repo)
-BR -> MP: bind{binding_id, room, thread}
-MP -> MX: create thread / pin room
-L -> BR: bind(worker, goal, goal=task)
-
-L --> O: session_id, binding (thread)
 
 == Run ==
-W -> CM: output events
-CM -> BR: observe
-BR -> MP: output{binding_id, event}
+W -> SH: events
+SH -> BR: observe (projected)
+BR -> MP: output{binding_handle, event}
 MP -> MX: post to thread
-W -> CM: turn.completed + exit
-CM -> SM: exited
-SM -> Lim: release(lease)
+W -> SH: turn.completed + exit
+SH -> SH: classify exit; confirm absence
+SH -> Cap: release(lease)
 MP -> MX: post result summary
 @enduml

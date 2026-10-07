@@ -1,56 +1,74 @@
 @startuml remote-worker-start
 !theme plain
-title Remote worker start: launcher -> rwh -> remote host, project attachment
+title Remote worker start: pin-carrying launch intent; the target composes and refuses on mismatch; no launcher-made bundle
 
 participant "Orchestrator" as O
-participant "Launcher" as L
-participant "Product registry" as Reg
+participant "Launcher\n(curator run)" as L
+participant "Product registry\n(S4)" as Reg
+participant "Capacity\n(S3, target gates)" as Cap
 participant "Trust\n(mandates)" as T
 participant "rwh (local)" as R
 participant "Worker jail" as J
-participant "Remote host\n(Mac mini)" as RH
-participant "Context manager" as CM
-participant "Context bridge" as BR
+participant "Remote host\n(curator-run on target)" as RH
+participant "Session host\n(Context Engine adapter)" as SH
+participant "Bridge\n(M3)" as BR
 
-O -> L: swarm launch ~--manifest developer\n--target remote:macmini ~--project X/repo ~--mode headless
-L -> Reg: binding(X/repo)
-Reg --> L: repo, landed ref, allowed hosts,\njail project, rooms, allow_from
+O -> L: launch, LaunchRequest JSON:\n{profile developer, expect_pin, target remote:macmini,\nbinding X/repo rev, mode headless, goal{task}}
+L -> Reg: binding(X/repo, rev)
+Reg --> L: digest, base policy, hosts[{name, host key fingerprint}],\njail project, egress, rooms, allow_from
 
-alt host not allowed for project
-  L --> O: refused (binding)
+alt host not in binding, or host key differs
+  L --> O: refused{binding}
 else allowed
-  opt first attach of this project to the host
-    L -> T: mandate consume (remote attach)
-    T --> L: verdict ok
-  end
-  L -> L: render manifest to bundle.json\n(role, task, goals, inlined skills, workspace)
-  alt one-shot
-    L -> R: rwh run ~--bundle DIR ~--out DIR ~--backend jail
-  else standing
-    L -> R: rwh worker ~--project ~--jail-project ~--room ~--allow-from
-  end
-  R -> J: provision(project, git bundle of landed ref)
-  R -> RH: ssh, scratch tool home, harness turn
-  note right of RH
-    Remote side: empty HOME,
-    tokens from authowner,
-    built-in tools off
-  end note
-  loop each tool call
-    RH -> R: tool call (bash, read_file, write_file, apply_patch)
-    R -> J: run in fresh container
-    J --> R: stdout, exit
-    R --> RH: tool result
-  end
-  R -> CM: relay turn output (rwh adapter)
-  CM -> BR: observe -> out providers
-  RH --> R: turn done
-  R -> J: export patch
-  R --> L: report.json, patch, calls.jsonl
-  alt needs_input (exit 75)
-    L --> O: questions[]; re-run with answers
-  else done
-    L --> O: patch + report for review
+  L -> Cap: admit_host(macmini, job_class)
+  alt gate refused (disk, cpu_idle, build_lock, syspolicyd)
+    L --> O: refused{capacity:gate} or queued
+  else lease
+    opt first attach of this binding revision to the host
+      L -> T: mandate consume (remote attach, binding rev)
+      T --> L: verdict ok
+    end
+    L -> L: resolve exact base_sha from the base policy
+    L -> R: launch intent{profile, profile_pin, binding{id, rev, digest},\nbase_sha, task_ref, io}
+    R -> RH: forward intent
+    RH -> RH: curator-run composes on the target;\ncompare lock with profile_pin (pin only across hosts)
+    alt lock mismatch
+      RH --> R: refused{pin_mismatch}
+      R --> L: refused
+      L --> O: refused{pin_mismatch}
+    else pin matches
+      RH --> R: accepted{profile_pin, plan_digest}
+      note right of RH
+        Curator launch keeps HOME. Empty HOME
+        only for jail turns. Any bundle is made
+        by Curator on the target, never by the
+        launcher. Standing workers need the pin too.
+      end note
+      alt one-shot
+        L -> R: rwh run (intent, out dir, backend jail)
+      else standing
+        L -> R: rwh worker (intent with pin, binding, room, allow_from)
+      end
+      R -> J: provision(jail project, git bundle of base_sha)
+      R -> SH: open rwh adapter (continuity fresh or seeded_rebuild)
+      SH -> RH: first turn: the task (authoritative launch-time item),\nnot argv, not a bundle prompt
+      loop each tool call
+        RH -> R: tool call (bash, read_file, write_file, apply_patch)
+        R -> J: run in fresh container
+        J --> R: stdout, exit
+        R --> RH: tool result
+      end
+      R -> SH: relay turn output (rwh adapter)
+      SH -> BR: observe (projected) -> out providers
+      RH --> R: turn done
+      R -> J: export patch
+      R --> L: report.json, patch, calls.jsonl, accepted pin
+      alt needs_input (exit 75)
+        L --> O: questions[]; re-run with answers
+      else done
+        L --> O: patch + report for review
+      end
+    end
   end
 end
 @enduml
