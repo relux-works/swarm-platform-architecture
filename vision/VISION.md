@@ -15,7 +15,7 @@ Decisions of both owners, recorded in the wiki ledger (`decisions.md`, "2026-10-
 | Each user gets its own key, unreachable by other agents; PKI / web of trust under the operator's root | New container **Key Keeper**: hierarchical derivation per agent identity (never per OS path), signatures and decryption over a local socket with peer-UID identification, the root and descendant signatures published; internal agents never hold private keys; external agents bring their own keys and are pinned |
 | Grants and a decision model; grants updated and delegated with attenuation only | M5 gains the delegation rule: a requester may grant at most a subset of its own delegable grants; the dispatcher refuses amplification at spawn. Open items: role → identity binding at spawn, revocation latency, grants to human and external keys (digest Q16–Q19) |
 | Spawns leave the board for the runtime; the board keeps its spawn interface and calls the runtime | New optional container **Launch Dispatcher**: run accounting, local capacity, OS-user lifecycle through one privileged helper; B4 becomes a client of it; without it the orchestrator calls `curator run` directly |
-| Remote workplace = an OS user on our host: SSH by the pinned key, tools inside the user boundary, Mailbox for tasks, connection towards the host only; the previous component name is retired | `workerJail` is renamed **Remote Workplace** (final name pending the owner's decision); LCH §8 wording updated accordingly |
+| Remote workplace = an OS user on our host: SSH by the pinned key, tools inside the user boundary, Mailbox for tasks, connection towards the host only; the previous component name is retired | the old container is renamed **Remote Workplace** (final name pending the owner's decision); LCH §8 wording updated accordingly |
 | Provider credentials: no interception of provider traffic in the first implementation; shared material where the harness tolerates it, the one-year token where it does not | New container **Credential Broker**; LCH §7 keeps `source_ref`; the proxy-injection path is research only |
 | Stable project team with idempotent bring-up; a system-administrator capability under a trust | Project binding gains `team[]` (role, identity, standing or ephemeral, max); S4 `up` brings standing members back; the privileged helper (not an agent) creates and removes users on requests carrying `user.create` |
 | The board becomes remote; session logs leave git | Priority change in §8; K7 unchanged |
@@ -260,7 +260,7 @@ The board is task management plus externally configured flows, under kernel guar
 | M3 + providers | BUILD | agent-session-bridge, durable admission, plugin ABI; Matrix doorbell over a2a; goal provider | IVANS §4; OURS §2.1, §5.3; C:618–663 |
 | M4 | REUSE + BUILD | curator-run (add compose-only: needs the 0019/0021 amendment), agents-management plan, Curator profiles; launch transaction; agents-infra launchers via Gate A | IVANS §2; CUR §2, §5 |
 | M5 | BUILD on REUSE | mandates (test-key prototype; real presence and enrollment missing), curator-trust (design) | OURS §2.2–2.4; JR Phase-0 table |
-| M6 | ADAPT | rwh + worker-jail; pin-carrying launch intent | OURS §2.2–2.4 |
+| M6 | ADAPT | rwh + remote workplace (an OS user on this host); pin-carrying launch intent | OURS §2.2–2.4 |
 | S1–S7 | REUSE / ADAPT | cmr, network-profiles, task-board limits + FIFO (extract and add gates), Curator + skill-registry, curator-keeper (S4, spec), a2a, ops bridges | TBK (1); IVANS §5 |
 | B1 | REUSE + BUILD | task-board kernel storage and CLI; `kguard` + `kernel-policy/1` | IVANS §6; KG |
 | B2 | REUSE spec, BUILD | curator-playbook v4.8 (PC1 seam, validator, narrow check) | PB §15 |
@@ -273,7 +273,7 @@ Conflicts with the R191 package, D-R1 to D-R8: **`vision/DECISIONS-FOR-OWNERS.md
 
 | # | Topic | State / recommendation |
 |---|---|---|
-| D1 | HOME vs tool-home | **Closed: tool-home only.** Empty HOME is for M6 jail turns only. |
+| D1 | HOME vs tool-home | **Closed: tool-home only.** Empty HOME is for M6 remote-workplace turns only. |
 | D2 | Headless ownership | Compose-only amendment of 0019 §2–3 and 0021 §6/§8 proposed (LCH §9); exec stays with the session host. Part of D-R3. |
 | D3 | Matrix vs carrier-neutral | Carrier-neutral; Matrix doorbell baseline first; XMPP if E2E is promised (D-R6). |
 | D4 | Native vs stdin goals | Goal truth per GOL; delivery by stdin nudge; `native_goal` boolean; two-week trial, which also measures the no-progress detector in shadow mode. |
