@@ -1,0 +1,65 @@
+@startuml delegated-action-handler
+!theme plain
+title Delegated action (v1.3): an external orchestrator commands a registered action under a grant chain; the gate verifies the chain, the registry names the handler, which is a deterministic process (B) or an agent (A)
+
+participant "External orchestrator\n(other owner's user, key signed by G2)" as XO
+participant "Their key keeper" as XK
+database "Shared room\n(federated carrier)" as MX
+participant "Our carrier provider" as MP
+participant "Our bridge\n(trust gate, decision guard)" as BR
+participant "Trust registry\n(keys, grants, actions)" as T
+participant "Handler A: admin orchestrator\n(OS user admin_orch)" as HA
+participant "Handler B: runner helper\n(privileged process)" as HB
+participant "Our session host" as SH
+
+== issue (before) ==
+note over T
+  G1: owner root -> external owner key K_alexis:
+      actions github-runner.*, target host:mini/runners/*,
+      delegable depth 1, expiry
+  G2: K_alexis -> their orchestrator key: subset of G1
+  registry: namespace github-runner.* -> handler (A or B), schema
+end note
+
+== command ==
+XO -> XK: sign envelope {action github-runner.restart,\ntarget host:mini/runners/x, grant_refs [G2, G1], expiry, nonce}
+XK --> XO: signature
+XO -> MX: post envelope (metadata carries the signature)
+MX -> MP: event
+MP -> MP: persist (fsync), then advance cursor
+MP -> BR: envelope bytes
+BR -> T: canonical bytes; key_id pinned? signature ok?\nchain G2 -> G1 -> our root: each link signed by its issuer,\nsubject == next issuer, actions/targets narrow, expiries nested;\nrevocation snapshot; freshness; replay; target binding
+alt any check fails
+  T --> BR: reject{reason}
+  BR -> MP: receipt refused; audit
+  MP -> MX: receipt
+else chain valid
+  BR -> BR: decision guard: request fits the grants and the schema;\nverification record {chain, checks, fingerprint}
+  BR -> T: handler for github-runner.* on host:mini?
+  alt handler is an agent (A)
+    T --> BR: handler = admin_orch
+    BR -> SH: enqueue(action item, authoritative, verification_ref) for admin_orch
+    SH -> HA: stdin: validated command <id>, fetch from mailbox
+    HA -> BR: mailbox read <id> → body + verification record
+    HA -> HA: optional re-verification; judgement (safe to restart now?)
+    HA -> HB: execute through the helper or its own narrow sudo rule
+    HB --> HA: done
+    HA -> BR: signed receipt applied | refused{reason}
+  else handler is a process (B)
+    T --> BR: handler = runner helper (socket)
+    BR -> HB: admitted command + verification record
+    HB -> T: re-verify the chain itself (never trusts the bridge alone)
+    HB -> HB: one registered operation: restart runner x; audit line
+    HB -> BR: receipt applied | refused{reason}, signed by the helper's identity
+  end
+  BR -> MP: receipt (signed)
+  MP -> MX: receipt in the thread
+  MX -> XO: receipt visible to the external orchestrator
+end
+
+note over BR, HB
+  No free text in the authority layer: the action is a registered
+  name with a schema; the target is concrete; wildcards exist only
+  in grants. The requester never judges its own request.
+end note
+@enduml

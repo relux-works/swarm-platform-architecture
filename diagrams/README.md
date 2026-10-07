@@ -29,7 +29,8 @@ diagrams/
 │   ├── remote-workplace-attach.puml # v1.3: remote harness attaches by SSH into its own OS user; tasks via mailbox
 │   ├── mailbox-delivery.puml        # v1.3: broker verification, decision guard, doorbell, mailbox read, outbound signing
 │   ├── grant-issue-and-check.puml   # v1.3: issuing, delegating (attenuation only), checking and revoking grants
-│   └── keeper-sign.puml             # v1.3: a process asks the key keeper to sign; peer-UID identification
+│   ├── keeper-sign.puml             # v1.3: a process asks the key keeper to sign; peer-UID identification
+│   └── delegated-action-handler.puml # v1.3: an external orchestrator's command under a grant chain; handler = process or agent
 └── artefacts/                   # generated renders (PNG + exported C4 PlantUML), tracked; regenerate after any change
 ```
 
