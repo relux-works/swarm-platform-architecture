@@ -27,6 +27,10 @@ platform = softwareSystem "Swarm Platform" "Holds agent sessions, wraps their I/
       tags "Store"
     }
     pluginApi = component "Plugin ABI" "swarm-plugin/1: pinned executables, handles, secret broker, limits, restart recovery" "JSONL over stdio"
+    decisionGuard = component "Decision Guard" "A small local model compares an admitted message with the addressee's grant specification and known injection patterns before the doorbell; the verdict is logged with a fingerprint and attached to the mailbox record" "local model"
+    mailbox = component "Mailbox" "Held bodies with their verification records, fetched by the agent through its tool (inbox read); In and Out" "Files, append-only" {
+      tags "Store"
+    }
     tails = component "Tails CLI" "swarm-tail goal and park (no mandate); post and inbox read (binding grant; post rate-limited and audited); session token = same-UID guardrail" "CLI"
     matrixProvider = component "Matrix Provider" "Subscribes to rooms and threads, persists before advancing the cursor, emits envelopes, posts projected output" "Child process over a2a" {
       tags "Plugin"
@@ -39,11 +43,19 @@ platform = softwareSystem "Swarm Platform" "Holds agent sessions, wraps their I/
     }
   }
 
-  trust = container "Trust" "curator-trust + mandates: exact-byte verification, grants, revocation snapshots, capability tokens; assurance mode T (mode S not claimed)" "mandate CLI + library"
+  trust = container "Trust" "curator-trust + mandates: exact-byte verification, grants with attenuation-only delegation, revocation snapshots, capability tokens; assurance mode T today, mode S through OS-user isolation (v1.3)" "mandate CLI + library"
 
-  remoteHarness = container "Remote Executor" "Runs a harness on another host from a pin-carrying launch intent; tools local and jailed; returns the accepted pin and plan digest" "rwh"
+  remoteHarness = container "Remote Executor" "Runs a harness on another host from a pin-carrying launch intent; tools run in the remote workplace on this host; returns the accepted pin and plan digest" "rwh"
 
-  workerJail = container "Worker Jail" "One hardened container per tool call, patches out" "worker-jail + colima"
+  remoteWorkplace = container "Remote Workplace" "One OS user on this host for a remote harness: SSH by the pinned key, tool calls run inside the user boundary, kernel firewall per UID; the component name is pending the owner's decision" "OS user + rwh"
+
+  dispatcher = container "Launch Dispatcher" "Optional module: run accounting (ids, status, wait, cancel, reconcile after a crash), local host capacity, OS-user lifecycle through one privileged helper; checks the spawn grant (attenuation only); the board's spawn calls it; without it the orchestrator calls the launcher directly" "Go daemon"
+
+  keyKeeper = container "Key Keeper" "Master secret in hardware-backed storage; hierarchical key derivation per agent identity (never per OS path); signs and decrypts on request over a local socket, identifying the caller by peer UID; publishes the root and descendant signatures; never releases a private key" "privileged daemon"
+
+  credentialBroker = container "Credential Broker" "Holds long-lived provider logins; hands each launch what its harness consumes (one-year token in env, API key through the helper command, shared file); tracks expiry; relays the vendor's own re-login flow to the operator's phone" "privileged daemon"
+
+  workplace = container "Agent Workplace" "One OS user per autonomous agent: home, ACL for the parent, kernel firewall admitting only the message broker and the egress proxy; created and removed by the dispatcher's helper; the unit of mode S" "OS user + kernel firewall"
 
   modelRouter = container "Model Router" "Model and effort per task class" "curator-model-router"
 
@@ -51,7 +63,7 @@ platform = softwareSystem "Swarm Platform" "Holds agent sessions, wraps their I/
 
   providerLimits = container "Capacity (S3)" "Slots, per-host gates (disk, CPU idle, build lock, syspolicyd), lease transfer, validation FIFO (board part B6)" "extracted from task-board"
 
-  registry = container "Product Registry / Keeper" "Products, projects, versioned project bindings (hosts, base, jail, egress, rooms, role bindings with slots), up after reboot" "curator-keeper registry"
+  registry = container "Product Registry / Keeper" "Products, projects, versioned project bindings (hosts, base, remote workplace, egress, rooms, role bindings with slots, team), up after reboot" "curator-keeper registry"
 
   environment = container "Environment Manager" "Role profiles, skills, MCP, command environment, managed tool homes, launch-env fragments (v3, then v4); curator playbook check" "Curator + skill-registry"
 

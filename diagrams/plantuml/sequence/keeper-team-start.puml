@@ -1,0 +1,36 @@
+@startuml keeper-team-start
+!theme plain
+title Keeper start with its standing team (v1.3): every autonomous agent is an OS user; identities come from the key keeper; bring-up is idempotent after a reboot
+
+actor "Owner" as OW
+participant "Registry / keeper\n(S4: binding, team[], up)" as Reg
+participant "Launch dispatcher" as D
+participant "Privileged helper\n(sudo: users, ACL, firewall)" as PH
+participant "Key keeper\n(master secret, derivation)" as KK
+participant "Launcher\n(curator run)" as L
+participant "Session host" as SH
+participant "Bridge\n(broker, mailbox)" as BR
+participant "Keeper session\n(OS user keeper_x)" as K
+
+== reboot or first start ==
+Reg -> Reg: boot_id changed; read team[] of product X:\n{role, identity, standing|ephemeral, max}
+Reg -> D: bring up standing members (idempotent)
+loop for each standing member (keeper first, then orchestrators)
+  D -> PH: ensure user <identity>: home, mode 0700,\nparent ACL (read), group, firewall rules for the UID
+  PH --> D: uid, home (no change if it already exists)
+  D -> KK: register(uid, identity path product/project/agent')
+  KK -> KK: derive public key for the path;\nroot signature "descendant N" published once
+  KK --> D: public key, registry record (unchanged if known)
+  D -> L: launch as <identity> (profile, expect_pin, binding)
+  L -> SH: intake (plan, pin, binding pin)
+  SH -> K: exec under a holder as the OS user; closed fence
+  L -> BR: bind I/O (rooms of product X), mailbox for the identity
+  SH -> SH: issue session token; readiness probe; fence open
+  SH --> D: RUN record {identity, uid, execution}
+end
+D --> Reg: team up; standing slots ready
+
+== later: an ephemeral worker ==
+K -> D: dispatch(LaunchRequest{role developer, ephemeral})
+note right of D: see spawn-with-user: new user, new key,\nremoved at retire
+@enduml

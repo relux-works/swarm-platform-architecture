@@ -1,0 +1,47 @@
+@startuml grant-issue-and-check
+!theme plain
+title Grants (v1.3): issuing by the owner, delegating with attenuation only, checking at every point of action, revoking
+
+actor "Owner\n(client app, root key)" as OW
+participant "Trust gateway\n(signed changes in)" as TG
+participant "Trust registry\n(grants, bindings, revocations)" as T
+participant "Orchestrator\n(OS user orch_a)" as O
+participant "Key keeper" as KK
+participant "Launch dispatcher" as D
+participant "Session host" as SH
+participant "Bridge\n(broker)" as BR
+participant "Task core\n(board, kguard)" as B
+
+== issue ==
+OW -> OW: grant {issuer: owner, subject: key of Alexis (external, pinned),\naction: operator-of (input, approve, control, transcript),\ntarget: orchestrator X, expiry, delegable: no}
+OW -> TG: signed grant record
+TG -> T: verify owner signature; append; new revocation snapshot id
+T --> BR: snapshot refresh (broker, host, dispatcher, core subscribe)
+
+== delegate (attenuation only) ==
+O -> KK: sign grant {issuer: orch_a, subject: w_17, action: post to thread t,\ntarget: room r, expiry ≤ own} (peer UID → key of orch_a)
+KK --> O: signature
+O -> TG: delegated grant
+TG -> T: check: orch_a holds a delegable grant covering\n(action, target) ⊇ the new grant? expiry not longer?
+alt wider than the issuer's own
+  T --> O: refused{amplification}
+else subset
+  T -> T: append; chain recorded (owner → orch_a → w_17)
+end
+
+== check at the point of action ==
+D -> T: spawn role R in P by orch_a? requested child grants ⊆ delegable?
+SH -> T: enqueue user_turn to X by sender S? (session.input, fresh, not revoked)
+BR -> T: may S write to a_7? (post/mailbox grant)
+B -> T: may run R move element E from s1 to s2? (role grant under the flow version)
+note over D, B
+  One verification library everywhere: parse, verify the signature
+  chain to the root, check expiry and conditions, consult the
+  revocation snapshot. The requester never judges its own request.
+end note
+
+== revoke ==
+OW -> TG: signed revocation of the grant (or of an identity)
+TG -> T: append; snapshot id bumps
+T --> SH: refresh; in-flight items re-admitted at dispatch against the new snapshot
+@enduml

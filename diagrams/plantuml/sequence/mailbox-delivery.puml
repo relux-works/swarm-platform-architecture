@@ -1,0 +1,48 @@
+@startuml mailbox-delivery
+!theme plain
+title Mailbox delivery (v1.3): the agent never reads the carrier; the broker verifies, the decision guard checks against grants, the doorbell rings, the agent fetches body + verification record; outbound is signed by the keeper
+
+database "Carrier\n(Matrix / XMPP)" as MX
+participant "Carrier provider\n(child process)" as MP
+participant "Bridge core\n(trust gate)" as BR
+participant "Trust\n(keys, grants, revocation)" as T
+participant "Decision guard\n(small local model)" as DG
+database "Mailbox\n(bodies + verification records)" as MB
+participant "Session host\n(admission, dispatcher)" as SH
+participant "Agent\n(OS user a_7)" as A
+participant "Key keeper" as KK
+
+== inbound ==
+MX -> MP: event addressed to agent a_7
+MP -> MP: persist (fsync); advance cursor
+MP -> BR: envelope bytes
+BR -> T: signature over exact bytes? key pinned? grant "write to a_7"?\nfresh, no replay, binding current?
+alt unsigned or unknown key
+  BR -> MB: quarantine body (no verification record)
+  BR -> SH: enqueue(doorbell: channel, claimed sender, id)
+else signed by a pinned key with the grant
+  BR -> DG: {body, sender grants, addressee grant spec}
+  DG -> DG: does the request fit the sender's grants towards a_7?\ninjection patterns? → verdict go | no-go, reasons
+  DG -> MB: record {body_sha256, sender, grants used, model version, verdict, fingerprint}
+  alt no-go
+    BR -> SH: enqueue(notice: refused by guard, fingerprint) (host_authored)
+  else go
+    BR -> SH: enqueue(doorbell + verification record ref, authoritative if the grant allows user_turn)
+  end
+end
+SH -> SH: admit() again; durable inbox; dispatch at a turn boundary
+SH -> A: stdin: "validated message <id> from <sender>: fetch from mailbox"\n(or the user turn itself when the grant allows it)
+
+== fetch and re-verify ==
+A -> MB: inbox read <id> (tool; binding grant; session token)
+MB --> A: body + verification record (who, which grant, what was checked, fingerprint)
+A -> A: optional second verification with the same library\n("security is never too much")
+
+== outbound ==
+A -> BR: post <binding> <text> (tool; rate-limited; audited)
+BR -> BR: audience projection for the room
+BR -> KK: sign(bytes) on behalf of a_7 (peer UID = bridge; identity a_7 bound)
+KK --> BR: signature
+BR -> MP: output{signed metadata, text}
+MP -> MX: post; people see ordinary text, the signature rides in metadata
+@enduml
