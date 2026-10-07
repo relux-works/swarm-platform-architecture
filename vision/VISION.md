@@ -22,7 +22,7 @@ Decisions of both owners, recorded in the wiki ledger (`decisions.md`, "2026-10-
 | Harness security prompts may be answered by the wrapper under policy | PLG §2: an allowlist of prompt kinds answered automatically under the parent's `session.approve`; everything else parks |
 | Plan: spec without the board → C4 and sequences → joint review → MVP without the board (two harnesses, one subscription, one machine, the user chain, the certificate handshake, a Matrix space) → the board | §8 gains the MVP milestone before Phase 2 |
 
-New sequences: `keeper-team-start`, `spawn-with-user`, `external-agent-onboarding`, `remote-workplace-attach`, `mailbox-delivery`, `grant-issue-and-check`, `keeper-sign`, `delegated-action-handler`. The action vocabulary is a registered set of namespaces with schemas and handlers (a registry record under `registry.actions.register`); handlers are deterministic processes for OS-level effects or agents where judgement is wanted; wildcards exist only in grants. Renders are regenerated separately.
+New sequences: `keeper-team-start`, `spawn-with-user`, `external-agent-onboarding`, `remote-workplace-attach`, `mailbox-delivery`, `grant-issue-and-check`, `keeper-sign`, `delegated-action-handler`, `action-namespace-registration`. The action vocabulary is a registered set of namespaces with schemas and handlers (a registry record under `registry.actions.register`); handlers are deterministic processes for OS-level effects or agents where judgement is wanted; wildcards exist only in grants. Renders are regenerated separately.
 
 ## 0. v1.2 changes (review round 2026-10-05)
 
