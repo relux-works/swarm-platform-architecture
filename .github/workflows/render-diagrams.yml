@@ -13,11 +13,16 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq graphviz default-jre-headless wget
           wget -q -O /tmp/plantuml.jar https://github.com/plantuml/plantuml/releases/download/v1.2025.4/plantuml-1.2025.4.jar
-      - name: C4 export (Structurizr CLI)
+      - name: C4 export (Structurizr CLI, pinned release)
         run: |
-          docker run --rm -v "$PWD:/w" -w /w structurizr/cli validate -workspace diagrams/c4/workspace.dsl
-          docker run --rm -v "$PWD:/w" -w /w structurizr/cli export -workspace diagrams/c4/workspace.dsl -format plantuml -output diagrams/artefacts/c4
+          wget -q -O /tmp/structurizr-cli.zip https://github.com/structurizr/cli/releases/download/v2025.11.09/structurizr-cli.zip
+          mkdir -p /tmp/structurizr && unzip -q /tmp/structurizr-cli.zip -d /tmp/structurizr
+          /tmp/structurizr/structurizr.sh validate -workspace diagrams/c4/workspace.dsl
+          rm -f diagrams/artefacts/c4/*.puml diagrams/artefacts/c4/*.png diagrams/artefacts/c4/*.svg
+          /tmp/structurizr/structurizr.sh export -workspace diagrams/c4/workspace.dsl -format plantuml -output diagrams/artefacts/c4
           rm -f diagrams/artefacts/c4/*-key.puml
+          ls diagrams/artefacts/c4
+          grep -q "Launch Dispatcher" diagrams/artefacts/c4/structurizr-Containers.puml
       - name: Render PNG and SVG
         run: |
           mkdir -p diagrams/artefacts/plantuml
