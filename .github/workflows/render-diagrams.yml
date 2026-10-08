@@ -26,9 +26,9 @@ jobs:
       - name: Render PNG and SVG
         run: |
           mkdir -p diagrams/artefacts/plantuml
-          java -jar /tmp/plantuml.jar -tpng diagrams/artefacts/c4/*.puml
+          java -DPLANTUML_LIMIT_SIZE=16384 -jar /tmp/plantuml.jar -tpng diagrams/artefacts/c4/*.puml
           java -jar /tmp/plantuml.jar -tsvg diagrams/artefacts/c4/*.puml
-          java -jar /tmp/plantuml.jar -tpng -o "$PWD/diagrams/artefacts/plantuml" diagrams/plantuml/sequence/*.puml
+          java -DPLANTUML_LIMIT_SIZE=16384 -jar /tmp/plantuml.jar -tpng -o "$PWD/diagrams/artefacts/plantuml" diagrams/plantuml/sequence/*.puml
           java -jar /tmp/plantuml.jar -tsvg -o "$PWD/diagrams/artefacts/plantuml" diagrams/plantuml/sequence/*.puml
       - uses: actions/upload-artifact@v4
         with:
