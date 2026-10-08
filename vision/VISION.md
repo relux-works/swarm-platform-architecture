@@ -1,7 +1,28 @@
 # Swarm platform: target architecture (vision)
 
-Status: PROPOSAL **v1.2** by the solution architect, 2026-10-05. Not canon; the reviewed revision was v1.1 (fa4fbc68). Sources: `00-owner-concept.md` (intent), `research/INVENTORY-OURS.md` (OURS), `research/INVENTORY-IVANS.md` (IVANS), `research/herdr-study.md` (HERDR), `research/tb-keeper-answer-2026-10-05.md` (TBK), `research/curator-advice-2026-10-05.md` (CUR), the curator-playbook spec v4.8 (PB; external, curator repo, `research/playbook/` is **not** in this snapshot). Review round: `research/joint-review-sol-2026-10-05.md` (JR; B = the R191 package, cited H/C/F as there) and `research/pr1-reviews-2026-10-05.md` (tb-keeper = TBK-R, ivan-curator = CUR-R). Detailed contracts: `vision/contracts/*.md`. Owner decisions: `vision/DECISIONS-FOR-OWNERS.md`. Diagrams: `diagrams/`. Flow example (illustrative, non-activatable): `vision/flows/swarm-project.Playbook.json`.
+Status: PROPOSAL **v1.3** (draft on top of v1.2; owners' call of 2026-10-07 folded in as §0). v1.2 by the solution architect, 2026-10-05. Not canon; the reviewed revision was v1.1 (fa4fbc68). Sources: `00-owner-concept.md` (intent), `research/INVENTORY-OURS.md` (OURS), `research/INVENTORY-IVANS.md` (IVANS), `research/herdr-study.md` (HERDR), `research/tb-keeper-answer-2026-10-05.md` (TBK), `research/curator-advice-2026-10-05.md` (CUR), the curator-playbook spec v4.8 (PB; external, curator repo, `research/playbook/` is **not** in this snapshot). Review round: `research/joint-review-sol-2026-10-05.md` (JR; B = the R191 package, cited H/C/F as there) and `research/pr1-reviews-2026-10-05.md` (tb-keeper = TBK-R, ivan-curator = CUR-R). Detailed contracts: `vision/contracts/*.md`. Owner decisions: `vision/DECISIONS-FOR-OWNERS.md`. Diagrams: `diagrams/`. Flow example (illustrative, non-activatable): `vision/flows/swarm-project.Playbook.json`.
 This design and Ivan's R191 package cover the same layer and go to ONE architecture review (TBK). v1.2 converges on B's supervisor/holder split, host-enforced admission, delivery evidence and restart fences (JR §5).
+
+## 0. v1.3 changes (owners' call 2026-10-07, Ivan and Alexis)
+
+Decisions of both owners, recorded in the wiki ledger (`decisions.md`, "2026-10-07 call") with the Russian digest `research/call-digest-2026-10-07.ru.md`. This section says what changes in the model; contracts are amended where noted and the diagrams are updated (`diagrams/`, new sequences listed in its README).
+
+| Decision | Change in v1.3 |
+|---|---|
+| Two channels into a session: the operator's root channel (direct write into the PTY by the host process, or an attached terminal under the exclusive lease) and the gateway channel (an outside request through the trust broker); both end in the same stdin; no tmux | Already expressed by ADM §4 (`terminal.attach`, `authoritative` envelopes) and the single dispatcher writer; stated explicitly in §4.2 |
+| Agents never read the carrier; the broker listens, verifies, rings the doorbell; the agent fetches through a Mailbox tool (In and Out) | M3 gains a **Decision Guard** (a small local model compares an admitted message with the addressee's grants and injection patterns before the doorbell; verdict logged with a fingerprint) and a **Mailbox** store; `swarm-tail inbox read` returns the verification record with the body |
+| One OS user per autonomous agent, keepers included; the kernel is the sandbox, no Docker | New container **Agent Workplace** (OS user, home, ACL for the parent, kernel firewall admitting only the broker and the egress proxy). Assurance mode **S** gets its path (O3 is no longer deferred); mode T remains the baseline until the isolation laboratory proves S |
+| Each user gets its own key, unreachable by other agents; PKI / web of trust under the operator's root | New container **Key Keeper**: hierarchical derivation per agent identity (never per OS path), signatures and decryption over a local socket with peer-UID identification, the root and descendant signatures published; internal agents never hold private keys; external agents bring their own keys and are pinned |
+| Grants and a decision model; grants updated and delegated with attenuation only | M5 gains the delegation rule: a requester may grant at most a subset of its own delegable grants; the dispatcher refuses amplification at spawn. Open items: role → identity binding at spawn, revocation latency, grants to human and external keys (digest Q16–Q19) |
+| Spawns leave the board for the runtime; the board keeps its spawn interface and calls the runtime | New optional container **Launch Dispatcher**: run accounting, local capacity, OS-user lifecycle through one privileged helper; B4 becomes a client of it; without it the orchestrator calls `curator run` directly |
+| Remote workplace = an OS user on our host: SSH by the pinned key, tools inside the user boundary, Mailbox for tasks, connection towards the host only; the previous component name is retired | the old container is renamed **Remote Workplace** (final name pending the owner's decision); LCH §8 wording updated accordingly |
+| Provider credentials: no interception of provider traffic in the first implementation; shared material where the harness tolerates it, the one-year token where it does not | New container **Credential Broker**; LCH §7 keeps `source_ref`; the proxy-injection path is research only |
+| Stable project team with idempotent bring-up; a system-administrator capability under a trust | Project binding gains `team[]` (role, identity, standing or ephemeral, max); S4 `up` brings standing members back; the privileged helper (not an agent) creates and removes users on requests carrying `user.create` |
+| The board becomes remote; session logs leave git | Priority change in §8; K7 unchanged |
+| Harness security prompts may be answered by the wrapper under policy | PLG §2: an allowlist of prompt kinds answered automatically under the parent's `session.approve`; everything else parks |
+| Plan: spec without the board → C4 and sequences → joint review → MVP without the board (two harnesses, one subscription, one machine, the user chain, the certificate handshake, a Matrix space) → the board | §8 gains the MVP milestone before Phase 2 |
+
+New sequences: `keeper-team-start`, `spawn-with-user`, `external-agent-onboarding`, `remote-workplace-attach`, `mailbox-delivery`, `grant-issue-and-check`, `keeper-sign`, `delegated-action-handler`, `action-namespace-registration`. The action vocabulary is a registered set of namespaces with schemas and handlers (a registry record under `registry.actions.register`); handlers are deterministic processes for OS-level effects or agents where judgement is wanted; wildcards exist only in grants. Renders are regenerated separately.
 
 ## 0. v1.2 changes (review round 2026-10-05)
 
@@ -72,7 +93,7 @@ Non-goals: our own runtime/harness (curator-agent-runtime, Apiary: deferred); a 
 | M3.x | Providers | Matrix/a2a, goal provider (scheduler), terminal watch, board provider (B5 client), later XMPP/Telegram | Child processes, `swarm-plugin/1` JSONL (PLG) |
 | M4 | Launcher | Thin client over the launch transaction (LCH): validate, capacity, compose via curator-run, compare `expect_pin`, hand to M1 or M6, drive initialize. Never reads a fragment or store content, never spells a flag, never execs or holds | `curator run` canonical entry; `swarm launch` optional wrapper (D-R3) |
 | M5 | Trust | Exact-byte envelope verification, pinned identities, mandates/grants, revocation snapshots, replay rules, capability tokens | curator-trust + mandates |
-| M6 | Remote executor | Runs a harness on another host while tools run locally in a jail; returns the accepted pin and plan digest | `rwh` + worker-jail |
+| M6 | Remote executor | Runs a harness on another host while tools run in the remote workplace on this host (an OS user); returns the accepted pin and plan digest | `rwh` + remote workplace |
 | S1–S7 | Services | S1 model router · S2 network profiles · S3 capacity: slots, per-host gates, validation FIFO (= B6) · S4 registry/keeper (project bindings) · S5 chat structure (a2a) · S6 environment/skill registry (Curator) · S7 ops bridges | Existing or specified, wrapped |
 | B1–B6 | Board | Task store with kernel guards, flow config + engine, role router, spawn, board goal binding, validation/limits (§5) | Board over the platform |
 
@@ -109,7 +130,7 @@ Project attachment of remotes is the versioned project binding in S4 (LCH §3). 
 | `tools`, `tails` | CIP-0002 `command_environment` (fragment v4) + CIP-0004 (append PATH, never source files); `swarm-tail` is one such command |
 | `permissions` | `native\|yolo` via the machine knob (0018); richer rules are machine config (CIP-0006, narrow 0014) |
 | `network_profile` | LaunchRequest field, default from the project binding (S2) |
-| `home_mode` | removed; empty HOME is a jail-turn property of M6 |
+| `home_mode` | removed; empty HOME is a property of remote-workplace turns in M6 |
 | native `/goal` | LaunchRequest `native_goal` boolean: an M2-injected first command, never a harness flag |
 | rwh `bundle.json` | produced by Curator from the pin if still needed, never by M4 (LCH §8) |
 
@@ -146,7 +167,7 @@ GOL. Board goal revisions live in B1 (CAS, slots); board-free goals live in the 
 | Service | Contract |
 |---|---|
 | S1 router | `route(task_class \| needs, difficulty, env?) -> {model, effort, reason}`; shadow mode logs only |
-| S2 network | `resolve(profile) -> egress policy`; `probe(adapter)`; enforced by the execution owner (host, M6/worker-jail) and rechecked on resume |
+| S2 network | `resolve(profile) -> egress policy`; `probe(adapter)`; enforced by the execution owner (host, M6 / remote workplace) and rechecked on resume |
 | S3 capacity (= B6) | `admit_host(host, job_class) -> lease \| refused{gate}` (disk R72/R167, CPU-idle R112, build lock tb-R193, syspolicyd tb-R194, slots), `release(lease)`, `transfer(lease, owner)`, `queue(validation_job) -> evidence` (FIFO). Bridge parser/replay budgets are separate and not in S3 |
 | S4 registry | `products()`, `projects(product)`, `binding(project) -> swarm-project-binding/1`, `processes()`, `up()` (reboot → M1 `resume`, the only automatic restore requester) |
 | S5 chat | `space/room/identity ensure` (identity under mandate), `card set`; naming `<host>_<project>_<role>`; carrier membership is not app authority |
@@ -239,7 +260,7 @@ The board is task management plus externally configured flows, under kernel guar
 | M3 + providers | BUILD | agent-session-bridge, durable admission, plugin ABI; Matrix doorbell over a2a; goal provider | IVANS §4; OURS §2.1, §5.3; C:618–663 |
 | M4 | REUSE + BUILD | curator-run (add compose-only: needs the 0019/0021 amendment), agents-management plan, Curator profiles; launch transaction; agents-infra launchers via Gate A | IVANS §2; CUR §2, §5 |
 | M5 | BUILD on REUSE | mandates (test-key prototype; real presence and enrollment missing), curator-trust (design) | OURS §2.2–2.4; JR Phase-0 table |
-| M6 | ADAPT | rwh + worker-jail; pin-carrying launch intent | OURS §2.2–2.4 |
+| M6 | ADAPT | rwh + remote workplace (an OS user on this host); pin-carrying launch intent | OURS §2.2–2.4 |
 | S1–S7 | REUSE / ADAPT | cmr, network-profiles, task-board limits + FIFO (extract and add gates), Curator + skill-registry, curator-keeper (S4, spec), a2a, ops bridges | TBK (1); IVANS §5 |
 | B1 | REUSE + BUILD | task-board kernel storage and CLI; `kguard` + `kernel-policy/1` | IVANS §6; KG |
 | B2 | REUSE spec, BUILD | curator-playbook v4.8 (PC1 seam, validator, narrow check) | PB §15 |
@@ -252,7 +273,7 @@ Conflicts with the R191 package, D-R1 to D-R8: **`vision/DECISIONS-FOR-OWNERS.md
 
 | # | Topic | State / recommendation |
 |---|---|---|
-| D1 | HOME vs tool-home | **Closed: tool-home only.** Empty HOME is for M6 jail turns only. |
+| D1 | HOME vs tool-home | **Closed: tool-home only.** Empty HOME is for M6 remote-workplace turns only. |
 | D2 | Headless ownership | Compose-only amendment of 0019 §2–3 and 0021 §6/§8 proposed (LCH §9); exec stays with the session host. Part of D-R3. |
 | D3 | Matrix vs carrier-neutral | Carrier-neutral; Matrix doorbell baseline first; XMPP if E2E is promised (D-R6). |
 | D4 | Native vs stdin goals | Goal truth per GOL; delivery by stdin nudge; `native_goal` boolean; two-week trial, which also measures the no-progress detector in shadow mode. |

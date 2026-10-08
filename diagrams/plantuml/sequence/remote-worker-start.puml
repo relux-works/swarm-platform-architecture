@@ -8,14 +8,14 @@ participant "Product registry\n(S4)" as Reg
 participant "Capacity\n(S3, target gates)" as Cap
 participant "Trust\n(mandates)" as T
 participant "rwh (local)" as R
-participant "Worker jail" as J
+participant "Remote workplace\n(OS user on this host)" as J
 participant "Remote host\n(curator-run on target)" as RH
 participant "Session host\n(Context Engine adapter)" as SH
 participant "Bridge\n(M3)" as BR
 
 O -> L: launch, LaunchRequest JSON:\n{profile developer, expect_pin, target remote:macmini,\nbinding X/repo rev, mode headless, goal{task}}
 L -> Reg: binding(X/repo, rev)
-Reg --> L: digest, base policy, hosts[{name, host key fingerprint}],\njail project, egress, rooms, allow_from
+Reg --> L: digest, base policy, hosts[{name, host key fingerprint}],\nremote workplace project, egress, rooms, allow_from
 
 alt host not in binding, or host key differs
   L --> O: refused{binding}
@@ -40,16 +40,16 @@ else allowed
       RH --> R: accepted{profile_pin, plan_digest}
       note right of RH
         Curator launch keeps HOME. Empty HOME
-        only for jail turns. Any bundle is made
+        only for remote workplace turns. Any bundle is made
         by Curator on the target, never by the
         launcher. Standing workers need the pin too.
       end note
       alt one-shot
-        L -> R: rwh run (intent, out dir, backend jail)
+        L -> R: rwh run (intent, out dir, backend remote workplace)
       else standing
         L -> R: rwh worker (intent with pin, binding, room, allow_from)
       end
-      R -> J: provision(jail project, git bundle of base_sha)
+      R -> J: provision(remote workplace project, git bundle of base_sha)
       R -> SH: open rwh adapter (continuity fresh or seeded_rebuild)
       SH -> RH: first turn: the task (authoritative launch-time item),\nnot argv, not a bundle prompt
       loop each tool call

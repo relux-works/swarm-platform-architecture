@@ -22,11 +22,20 @@ diagrams/
 │   ├── context-takeover.puml        # fence, confirmed absence, seed or native resume
 │   ├── controlled-restart.puml      # fence, drain, park, absence, eligibility, reconcile, release
 │   ├── board-transition-spawn.puml  # proposal -> kguard -> intent -> role router -> spawn
-│   └── flow-config-load.puml        # narrow check, confirmation, atomic activation, generation fence
+│   ├── flow-config-load.puml        # narrow check, confirmation, atomic activation, generation fence
+│   ├── keeper-team-start.puml       # v1.3: keeper and its standing team brought up idempotently as OS users
+│   ├── spawn-with-user.puml         # v1.3: spawn through the dispatcher: grant, capacity, OS user, key, launch, retire
+│   ├── external-agent-onboarding.puml # v1.3: self-signed certificate, pin, encrypted credential package, workplace
+│   ├── remote-workplace-attach.puml # v1.3: remote harness attaches by SSH into its own OS user; tasks via mailbox
+│   ├── mailbox-delivery.puml        # v1.3: broker verification, decision guard, doorbell, mailbox read, outbound signing
+│   ├── grant-issue-and-check.puml   # v1.3: issuing, delegating (attenuation only), checking and revoking grants
+│   ├── keeper-sign.puml             # v1.3: a process asks the key keeper to sign; peer-UID identification
+│   ├── delegated-action-handler.puml # v1.3: an external orchestrator's command under a grant chain; handler = process or agent
+│   └── action-namespace-registration.puml # v1.3: handler manifest, namespace registration (owner or agent within a prefix), issue-time check
 └── artefacts/                   # generated renders (PNG + exported C4 PlantUML), tracked; regenerate after any change
 ```
 
-Matches VISION v1.2 and `vision/contracts/`. The session host (M1 supervisor + holder + Context Engine package + goal ledger + host store) and the bridge (M3 with provider child processes) are separate containers (JR A-M5, D-R7). Elements tagged `Plugin` (Matrix, goal and terminal providers, the delivery module, B5) render with a dashed border; the export keeps it as `LineStyle 10-10`. The launcher is a thin client over the composer (curator-run + agents-management). The board flow example `vision/flows/swarm-project.Playbook.json` is illustrative and non-activatable. In sequence message text, write `--` as `~--`.
+Matches VISION v1.3 (v1.2 plus the owners' call of 2026-10-07) and `vision/contracts/`. The v1.3 sequences are not rendered yet; run the render steps below after any change. The session host (M1 supervisor + holder + Context Engine package + goal ledger + host store) and the bridge (M3 with provider child processes) are separate containers (JR A-M5, D-R7). Elements tagged `Plugin` (Matrix, goal and terminal providers, the delivery module, B5) render with a dashed border; the export keeps it as `LineStyle 10-10`. The launcher is a thin client over the composer (curator-run + agents-management). The board flow example `vision/flows/swarm-project.Playbook.json` is illustrative and non-activatable. In sequence message text, write `--` as `~--`.
 
 ## Render
 

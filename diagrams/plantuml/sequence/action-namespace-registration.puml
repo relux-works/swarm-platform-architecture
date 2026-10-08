@@ -1,0 +1,41 @@
+@startuml action-namespace-registration
+!theme plain
+title Action vocabulary (v1.3): a handler declares its actions, the owner (or an agent with registry.actions.register) registers the namespace, grants and commands may then name it; example github-runner.*
+
+participant "Runner helper\n(privileged process, own identity)" as HB
+participant "Key keeper" as KK
+participant "Trust registry\n(keys, grants, action namespaces)" as T
+actor "Owner\n(client app, root key)" as OW
+participant "Admin orchestrator\n(grant registry.actions.register, prefix ops.*)" as AO
+participant "Our bridge\n(trust gate)" as BR
+
+== 1. the handler declares itself ==
+HB -> KK: sign handler-manifest/1 {actions github-runner.{start,stop,restart,register}\nwith argument schemas, target form host:mini/runners/<runner>, effects irreversible}
+KK --> HB: signature (identity of the helper)
+HB -> T: publish manifest
+
+== 2. the namespace is registered ==
+alt by the owner
+  OW -> T: action-namespace/1 {namespace github-runner.*, handler runner-helper,\nmanifest_sha256, hosts [host:mini], grantable_by [root, role:admin]} signed by root
+else by an agent under a delegable grant
+  AO -> KK: sign action-namespace/1 {namespace ops.deploy.*, handler ..., ...}
+  KK --> AO: signature
+  AO -> T: record + grant chain (registry.actions.register, prefix ops.*)
+  T -> T: verify chain to the root; prefix allowed? not session.* etc.
+  alt outside the agent's prefix
+    T --> AO: refused{prefix}
+  else inside
+    T -> T: append
+  end
+end
+T -> T: same name again: only the same handler, or a root-signed replacement;\nremoval = revocation record
+
+== 3. grants and commands name it ==
+OW -> T: grant G1 {subject K_alexis, actions [github-runner.restart, stop],\ntargets [host:mini/runners/*], conditions caveats/v1 (hours, max_per_hour),\ndelegable depth 1}
+T -> T: issue-time check: every action in G1 is registered → accept\n(a grant on an unregistered action is refused at issue)
+note over BR
+  Later, a command with action github-runner.restart is checked at the gate
+  against the manifest's argument schema and the grant chain, then passed
+  to the registry-named handler (see delegated-action-handler).
+end note
+@enduml

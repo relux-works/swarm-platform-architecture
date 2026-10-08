@@ -1,0 +1,58 @@
+@startuml spawn-with-user
+!theme plain
+title Spawn through the dispatcher (v1.3): grant check without amplification, capacity, OS user, key, launch, result, retire
+
+participant "Orchestrator\n(OS user orch_a)" as O
+participant "Launch dispatcher" as D
+participant "Trust\n(grants, revocation)" as T
+participant "Capacity (S3)" as Cap
+participant "Privileged helper\n(sudo)" as PH
+participant "Key keeper" as KK
+participant "Launcher\n(curator run)" as L
+participant "Credential broker" as CB
+participant "Session host" as SH
+participant "Bridge" as BR
+participant "Worker\n(OS user w_17)" as W
+participant "Task core\n(board)" as B
+
+O -> D: dispatch(LaunchRequest{request_id, role developer, profile+pin,\nmode headless, io thread, grants requested for the child})
+D -> T: granted(orch_a, spawn.role developer, project P)?\nrequested child grants ⊆ delegable grants of orch_a?
+alt not granted or amplification
+  T --> D: refused{grant | amplification}
+  D --> O: refused
+else granted
+  T --> D: ok
+  D -> Cap: admit_host(local, job_class)
+  alt no slot or a gate refuses
+    Cap --> D: queued{handle} | refused{gate}
+    D --> O: queued | refused
+  else lease
+    D -> PH: create user w_17: home 0750 under the agents tree,\nACL orch_a read (inherit), firewall: only broker + egress proxy
+    PH --> D: uid
+    D -> KK: register(uid, path product/P/w_17')
+    KK --> D: public key + root signature (registry record)
+    D -> T: bind role developer -> identity w_17 for project P\n(signed by the dispatcher under the owner's delegable grant)
+    D -> L: launch as w_17 (compose-only plan, expect_pin)
+    L -> SH: intake; fence closed
+    SH -> CB: resolve credential source_ref for the harness\n(env token | helper | shared file), peer UID = host
+    CB --> SH: material for this launch only
+    SH -> W: exec under a holder as uid w_17
+    L -> BR: bind(thread, audience); mailbox for w_17
+    SH -> SH: token, readiness, fence open
+    SH --> D: RUN{request_id, identity w_17, execution}
+    D --> O: RunHandle (RUN record kept by the dispatcher)
+    D -> B: RUN attached to the element (reconciliation)
+  end
+end
+
+== result ==
+W -> BR: post result (binding grant); keeper signs
+BR -> B: outcome proposal (B5)
+B -> B: accept or refuse; review by the playbook
+
+== retire ==
+D -> SH: stop; confirm absence
+D -> PH: archive home, delete user w_17, remove firewall rules
+D -> KK: revoke(identity w_17) → root-signed revocation record
+D -> T: revocation snapshot refreshed
+@enduml

@@ -1,0 +1,45 @@
+@startuml remote-workplace-attach
+!theme plain
+title Remote workplace (v1.3): the remote harness attaches by SSH into its own OS user on our host; tool calls run inside that boundary; tasks arrive through the mailbox; no commands flow towards the remote machine
+
+participant "Remote harness\n(model on the remote side)" as RH
+participant "SSH daemon\n(our host)" as SSHD
+participant "Remote workplace\n(OS user ext_k: home, firewall)" as WP
+participant "rwh tool runner\n(inside ext_k)" as RW
+participant "Orchestrator" as O
+participant "Bridge\n(broker, mailbox)" as BR
+participant "Task core (board)" as B
+database "Carrier" as MX
+
+== attach (connection towards our host only) ==
+RH -> SSHD: ssh ext_k@host, key K (pinned in authorized_keys);\nhost key fingerprint checked against the credential package
+SSHD -> WP: session as uid ext_k; forced command: rwh tool runner
+WP -> RW: start inside the user boundary\n(firewall: only broker + egress proxy; no other egress)
+RW --> RH: tool channel open (framed over the SSH session)
+note right of RW
+  Only tool execution crosses this channel.
+  Our side never opens a connection to the
+  remote machine and never sends commands into it.
+end note
+
+== task ==
+O -> B: snapshot of the task for K (projection of one element)
+O -> BR: signed message to K: "task X, snapshot ref" (grant: session.input? no — post to K's mailbox)
+BR -> BR: verify signature, grant, decision guard; mailbox record
+BR -> MX: doorbell to K's identity
+RH -> BR: mailbox read (through its tool, over the carrier) → body + verification record
+RH -> RH: agent loop decides to take the task
+
+== work ==
+loop tool calls
+  RH -> RW: tool call (bash, git, files) over the SSH channel
+  RW -> WP: execute as ext_k; egress only through the profile proxy
+  RW --> RH: result
+end
+RH -> BR: post result (signed by K); audience projection → thread
+BR -> B: outcome proposal for the element
+
+== retire ==
+O -> O: revoke K's workplace (grant user.create)
+note right of O: archive home, remove authorized_keys,\ndelete user ext_k, remove firewall rules;\nK's identity stays pinned unless revoked
+@enduml
