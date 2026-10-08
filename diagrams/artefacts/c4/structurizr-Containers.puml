@@ -3,83 +3,165 @@ title <size:24>Container View: Swarm Platform</size>\n<size:24>Platform modules 
 
 set separator none
 left to right direction
+skinparam ranksep 60
+skinparam nodesep 30
+hide stereotype
 
 <style>
   root {
-    BackgroundColor: #ffffff
-    FontColor: #444444
+    BackgroundColor: #ffffff;
+    FontColor: #444444;
+  }
+  // Element,Container
+  .Element-RWxlbWVudCxDb250YWluZXI= {
+    BackgroundColor: #438dd5;
+    LineColor: #2e6295;
+    LineStyle: 0;
+    LineThickness: 2;
+    FontColor: #ffffff;
+    FontSize: 24;
+    HorizontalAlignment: center;
+    Shadowing: 0;
+    MaximumWidth: 450;
+  }
+  // Element,Container,Harness
+  .Element-RWxlbWVudCxDb250YWluZXIsSGFybmVzcw== {
+    BackgroundColor: #438dd5;
+    LineColor: #2e6295;
+    LineStyle: 0;
+    LineThickness: 2;
+    FontColor: #ffffff;
+    FontSize: 24;
+    HorizontalAlignment: center;
+    Shadowing: 0;
+    MaximumWidth: 450;
+  }
+  // Element,Person
+  .Element-RWxlbWVudCxQZXJzb24= {
+    BackgroundColor: #08427b;
+    LineColor: #052e56;
+    LineStyle: 0;
+    LineThickness: 2;
+    FontColor: #ffffff;
+    FontSize: 24;
+    HorizontalAlignment: center;
+    Shadowing: 0;
+    MaximumWidth: 450;
+  }
+  // Element,Software System,External
+  .Element-RWxlbWVudCxTb2Z0d2FyZSBTeXN0ZW0sRXh0ZXJuYWw= {
+    BackgroundColor: #999999;
+    LineColor: #6b6b6b;
+    LineStyle: 0;
+    LineThickness: 2;
+    FontColor: #ffffff;
+    FontSize: 24;
+    HorizontalAlignment: center;
+    Shadowing: 0;
+    MaximumWidth: 450;
+  }
+  // Relationship
+  .Relationship-UmVsYXRpb25zaGlw {
+    LineThickness: 2;
+    LineStyle: 10-10;
+    LineColor: #444444;
+    FontColor: #444444;
+    FontSize: 24;
+  }
+  // Swarm Platform
+  .Boundary-U3dhcm0gUGxhdGZvcm0= {
+    BackgroundColor: #ffffff;
+    LineColor: #0b4884;
+    LineStyle: 0;
+    LineThickness: 2;
+    FontColor: #ffffff;
+    FontSize: 24;
+    HorizontalAlignment: center;
+    Shadowing: 0;
   }
 </style>
 
-!include <C4/C4>
-!include <C4/C4_Context>
-!include <C4/C4_Container>
+person "==Owner\n<size:16>[Person]</size>\n\nSets direction, signs mandates, talks to keepers in product spaces" <<Element-RWxlbWVudCxQZXJzb24=>> as Owner
+person "==Co-founder / operator\n<size:16>[Person]</size>\n\nRuns nodes, reviews architecture, attaches to sessions" <<Element-RWxlbWVudCxQZXJzb24=>> as Cofounderoperator
+rectangle "==Matrix Homeserver (a2a)\n<size:16>[Software System]</size>\n\nSpaces, rooms and threads; a2a mailbox and identities" <<Element-RWxlbWVudCxTb2Z0d2FyZSBTeXN0ZW0sRXh0ZXJuYWw=>> as MatrixHomeservera2a
+rectangle "==Model Providers\n<size:16>[Software System]</size>\n\nAnthropic, OpenAI, local inference-manager endpoints" <<Element-RWxlbWVudCxTb2Z0d2FyZSBTeXN0ZW0sRXh0ZXJuYWw=>> as ModelProviders
+rectangle "==Remote Host\n<size:16>[Software System]</size>\n\nMac mini with subscriptions, runs the remote harness side" <<Element-RWxlbWVudCxTb2Z0d2FyZSBTeXN0ZW0sRXh0ZXJuYWw=>> as RemoteHost
+rectangle "==Git Repositories\n<size:16>[Software System]</size>\n\nOne repo per project" <<Element-RWxlbWVudCxTb2Z0d2FyZSBTeXN0ZW0sRXh0ZXJuYWw=>> as GitRepositories
 
-Person(Owner, "Owner", $descr="Sets direction, signs mandates, talks to keepers in product spaces", $tags="", $link="")
-Person(Cofounderoperator, "Co-founder / operator", $descr="Runs nodes, reviews architecture, attaches to sessions", $tags="", $link="")
-System(MatrixHomeservera2a, "Matrix Homeserver (a2a)", $descr="Spaces, rooms and threads; a2a mailbox and identities", $tags="", $link="")
-System(ModelProviders, "Model Providers", $descr="Anthropic, OpenAI, local inference-manager endpoints", $tags="", $link="")
-System(RemoteHost, "Remote Host", $descr="Mac mini with subscriptions, runs the remote harness side", $tags="", $link="")
-System(GitRepositories, "Git Repositories", $descr="One repo per project", $tags="", $link="")
-
-System_Boundary("SwarmPlatform_boundary", "Swarm Platform", $tags="") {
-  Container(SwarmPlatform.AgentHarnessSession, "Agent Harness Session", $techn="Native CLI", $descr="Claude Code, Codex, Muse or Pi process in a Curator managed tool home (HOME kept)", $tags="", $link="")
-  Container(SwarmPlatform.BridgeM3, "Bridge (M3)", $techn="agent-session-bridge", $descr="Hosts provider processes; trust gate; durable bridge-local admission; host enqueue; audience-checked outbox; tails", $tags="", $link="")
-  Container(SwarmPlatform.Trust, "Trust", $techn="mandate CLI + library", $descr="curator-trust + mandates: exact-byte verification, grants, revocation snapshots, capability tokens; assurance mode T (mode S not claimed)", $tags="", $link="")
-  Container(SwarmPlatform.RemoteExecutor, "Remote Executor", $techn="rwh", $descr="Runs a harness on another host from a pin-carrying launch intent; tools local and jailed; returns the accepted pin and plan digest", $tags="", $link="")
-  Container(SwarmPlatform.WorkerJail, "Worker Jail", $techn="worker-jail + colima", $descr="One hardened container per tool call, patches out", $tags="", $link="")
-  Container(SwarmPlatform.ModelRouter, "Model Router", $techn="curator-model-router", $descr="Model and effort per task class", $tags="", $link="")
-  Container(SwarmPlatform.NetworkProfiles, "Network Profiles", $techn="curator-network-profiles", $descr="Egress profiles and conformance probe", $tags="", $link="")
-  Container(SwarmPlatform.CapacityS3, "Capacity (S3)", $techn="extracted from task-board", $descr="Slots, per-host gates (disk, CPU idle, build lock, syspolicyd), lease transfer, validation FIFO (board part B6)", $tags="", $link="")
-  Container(SwarmPlatform.ProductRegistryKeeper, "Product Registry / Keeper", $techn="curator-keeper registry", $descr="Products, projects, versioned project bindings (hosts, base, jail, egress, rooms, role bindings with slots), up after reboot", $tags="", $link="")
-  Container(SwarmPlatform.EnvironmentManager, "Environment Manager", $techn="Curator + skill-registry", $descr="Role profiles, skills, MCP, command environment, managed tool homes, launch-env fragments (v3, then v4); curator playbook check", $tags="", $link="")
-  Container(SwarmPlatform.Board, "Board", $techn="task-board kernel + curator-playbook", $descr="Task management with externally configured flows (Playbook.json) under kernel guards; a client of the launcher, bridge, capacity and registry; built in Phase 4", $tags="", $link="")
-  Container(SwarmPlatform.Launcherthinclient, "Launcher (thin client)", $techn="curator run (canonical) / swarm launch (optional wrapper)", $descr="Launch transaction: prepare, capacity, compose, compare expect_pin, admit, start, initialize, ready, with compensation. Never reads a fragment or store content, spells a flag, execs or holds", $tags="", $link="")
-  Container(SwarmPlatform.Composer, "Composer", $techn="curator-run + agents-management (one construction site)", $descr="The only composer and fragment reader: resolves the role profile, builds one Decision 0013 plan (interactive, headless, hosted-stream with session-start permission frames); compose-only and compare-only answers", $tags="", $link="")
-  Container(SwarmPlatform.SessionHostM1M2, "Session Host (M1 + M2)", $techn="agent-session-host (Phase-0 baseline: tb-sessiond)", $descr="One codebase: supervisor, minimal execution holders, host-enforced admission and fences, Context Engine package, goal ledger, host-owned journal", $tags="", $link="")
+rectangle "Swarm Platform\n<size:16>[Software System]</size>" <<Boundary-U3dhcm0gUGxhdGZvcm0=>> {
+  person "==Agent Harness Session\n<size:16>[Container: Native CLI]</size>\n\nClaude Code, Codex, Muse or Pi process in a Curator managed tool home (HOME kept)" <<Element-RWxlbWVudCxDb250YWluZXIsSGFybmVzcw==>> as SwarmPlatform.AgentHarnessSession
+  rectangle "==Bridge (M3)\n<size:16>[Container: agent-session-bridge]</size>\n\nHosts provider processes; trust gate; durable bridge-local admission; host enqueue; audience-checked outbox; tails" <<Element-RWxlbWVudCxDb250YWluZXI=>> as SwarmPlatform.BridgeM3
+  rectangle "==Trust\n<size:16>[Container: mandate CLI + library]</size>\n\ncurator-trust + mandates: exact-byte verification, grants with attenuation-only delegation, revocation snapshots, capability tokens; assurance mode T today, mode S through OS-user isolation (v1.3)" <<Element-RWxlbWVudCxDb250YWluZXI=>> as SwarmPlatform.Trust
+  rectangle "==Remote Executor\n<size:16>[Container: rwh]</size>\n\nRuns a harness on another host from a pin-carrying launch intent; tools run in the remote workplace on this host; returns the accepted pin and plan digest" <<Element-RWxlbWVudCxDb250YWluZXI=>> as SwarmPlatform.RemoteExecutor
+  rectangle "==Remote Workplace\n<size:16>[Container: OS user + rwh]</size>\n\nOne OS user on this host for a remote harness: SSH by the pinned key, tool calls run inside the user boundary, kernel firewall per UID; the component name is pending the owner's decision" <<Element-RWxlbWVudCxDb250YWluZXI=>> as SwarmPlatform.RemoteWorkplace
+  rectangle "==Launch Dispatcher\n<size:16>[Container: Go daemon]</size>\n\nOptional module: run accounting (ids, status, wait, cancel, reconcile after a crash), local host capacity, OS-user lifecycle through one privileged helper; checks the spawn grant (attenuation only); the board's spawn calls it; without it the orchestrator calls the launcher directly" <<Element-RWxlbWVudCxDb250YWluZXI=>> as SwarmPlatform.LaunchDispatcher
+  rectangle "==Key Keeper\n<size:16>[Container: privileged daemon]</size>\n\nMaster secret in hardware-backed storage; hierarchical key derivation per agent identity (never per OS path); signs and decrypts on request over a local socket, identifying the caller by peer UID; publishes the root and descendant signatures; never releases a private key" <<Element-RWxlbWVudCxDb250YWluZXI=>> as SwarmPlatform.KeyKeeper
+  rectangle "==Credential Broker\n<size:16>[Container: privileged daemon]</size>\n\nHolds long-lived provider logins; hands each launch what its harness consumes (one-year token in env, API key through the helper command, shared file); tracks expiry; relays the vendor's own re-login flow to the operator's phone" <<Element-RWxlbWVudCxDb250YWluZXI=>> as SwarmPlatform.CredentialBroker
+  rectangle "==Agent Workplace\n<size:16>[Container: OS user + kernel firewall]</size>\n\nOne OS user per autonomous agent: home, ACL for the parent, kernel firewall admitting only the message broker and the egress proxy; created and removed by the dispatcher's helper; the unit of mode S" <<Element-RWxlbWVudCxDb250YWluZXI=>> as SwarmPlatform.AgentWorkplace
+  rectangle "==Model Router\n<size:16>[Container: curator-model-router]</size>\n\nModel and effort per task class" <<Element-RWxlbWVudCxDb250YWluZXI=>> as SwarmPlatform.ModelRouter
+  rectangle "==Network Profiles\n<size:16>[Container: curator-network-profiles]</size>\n\nEgress profiles and conformance probe" <<Element-RWxlbWVudCxDb250YWluZXI=>> as SwarmPlatform.NetworkProfiles
+  rectangle "==Capacity (S3)\n<size:16>[Container: extracted from task-board]</size>\n\nSlots, per-host gates (disk, CPU idle, build lock, syspolicyd), lease transfer, validation FIFO (board part B6)" <<Element-RWxlbWVudCxDb250YWluZXI=>> as SwarmPlatform.CapacityS3
+  rectangle "==Product Registry / Keeper\n<size:16>[Container: curator-keeper registry]</size>\n\nProducts, projects, versioned project bindings (hosts, base, remote workplace, egress, rooms, role bindings with slots, team), up after reboot" <<Element-RWxlbWVudCxDb250YWluZXI=>> as SwarmPlatform.ProductRegistryKeeper
+  rectangle "==Environment Manager\n<size:16>[Container: Curator + skill-registry]</size>\n\nRole profiles, skills, MCP, command environment, managed tool homes, launch-env fragments (v3, then v4); curator playbook check" <<Element-RWxlbWVudCxDb250YWluZXI=>> as SwarmPlatform.EnvironmentManager
+  rectangle "==Board\n<size:16>[Container: task-board kernel + curator-playbook]</size>\n\nTask management with externally configured flows (Playbook.json) under kernel guards; a client of the launcher, bridge, capacity and registry; built in Phase 4" <<Element-RWxlbWVudCxDb250YWluZXI=>> as SwarmPlatform.Board
+  rectangle "==Launcher (thin client)\n<size:16>[Container: curator run (canonical) / swarm launch (optional wrapper)]</size>\n\nLaunch transaction: prepare, capacity, compose, compare expect_pin, admit, start, initialize, ready, with compensation. Never reads a fragment or store content, spells a flag, execs or holds" <<Element-RWxlbWVudCxDb250YWluZXI=>> as SwarmPlatform.Launcherthinclient
+  rectangle "==Composer\n<size:16>[Container: curator-run + agents-management (one construction site)]</size>\n\nThe only composer and fragment reader: resolves the role profile, builds one Decision 0013 plan (interactive, headless, hosted-stream with session-start permission frames); compose-only and compare-only answers" <<Element-RWxlbWVudCxDb250YWluZXI=>> as SwarmPlatform.Composer
+  rectangle "==Session Host (M1 + M2)\n<size:16>[Container: agent-session-host (Phase-0 baseline: tb-sessiond)]</size>\n\nOne codebase: supervisor, minimal execution holders, host-enforced admission and fences, Context Engine package, goal ledger, host-owned journal" <<Element-RWxlbWVudCxDb250YWluZXI=>> as SwarmPlatform.SessionHostM1M2
 }
 
-Rel(SwarmPlatform.AgentHarnessSession, SwarmPlatform.BridgeM3, "Agent runs tail commands", $techn="shell tool", $tags="", $link="")
-Rel(SwarmPlatform.BridgeM3, MatrixHomeservera2a, "Subscribes and posts", $techn="a2a / Matrix CS API", $tags="", $link="")
-Rel(SwarmPlatform.BridgeM3, SwarmPlatform.CapacityS3, "Checks nudge budget", $techn="acquire()", $tags="", $link="")
-Rel(SwarmPlatform.AgentHarnessSession, ModelProviders, "Model calls", $techn="HTTPS", $tags="", $link="")
-Rel(SwarmPlatform.AgentHarnessSession, GitRepositories, "Works in project repo", $techn="git", $tags="", $link="")
-Rel(SwarmPlatform.RemoteExecutor, RemoteHost, "Target curator-run composes and refuses on pin mismatch; harness turns", $techn="ssh + unix sockets", $tags="", $link="")
-Rel(SwarmPlatform.RemoteExecutor, SwarmPlatform.WorkerJail, "Runs tool calls", $techn="worker-jail run", $tags="", $link="")
-Rel(SwarmPlatform.RemoteExecutor, SwarmPlatform.SessionHostM1M2, "Relays turns and output", $techn="adapter over rwh", $tags="", $link="")
-Rel(SwarmPlatform.WorkerJail, GitRepositories, "Seeds from the exact base SHA, exports patch", $techn="git bundle", $tags="", $link="")
-Rel(RemoteHost, ModelProviders, "Model calls on remote subscriptions", $techn="HTTPS", $tags="", $link="")
-Rel(SwarmPlatform.ModelRouter, ModelProviders, "Knows provider capabilities", $techn="catalog", $tags="", $link="")
-Rel(SwarmPlatform.Board, GitRepositories, "Reads Playbook.json at the default-branch head", $techn="git", $tags="", $link="")
-Rel(SwarmPlatform.Board, SwarmPlatform.EnvironmentManager, "Validates and resolves the closure and role skills", $techn="curator playbook check", $tags="", $link="")
-Rel(SwarmPlatform.Board, SwarmPlatform.Trust, "Asks whether a version is confirmed or covered", $techn="confirmed/granted/narrowed", $tags="", $link="")
-Rel(SwarmPlatform.Board, SwarmPlatform.ProductRegistryKeeper, "Reads role bindings, pins and slots", $techn="binding()", $tags="", $link="")
-Rel(SwarmPlatform.Board, SwarmPlatform.Launcherthinclient, "Launches the role with the spawn key", $techn="launch(LaunchRequest)", $tags="", $link="")
-Rel(SwarmPlatform.Board, SwarmPlatform.BridgeM3, "Publishes goal revisions, receives outcome proposals", $techn="swarm-plugin/1", $tags="", $link="")
-Rel(SwarmPlatform.Board, SwarmPlatform.CapacityS3, "Slots, gates and validation FIFO", $techn="acquire/queue", $tags="", $link="")
-Rel(Owner, MatrixHomeservera2a, "Talks to keepers in product spaces", $techn="", $tags="", $link="")
-Rel(Owner, SwarmPlatform.Trust, "Signs mandates, grants and authoritative envelopes", $techn="mandate CLI", $tags="", $link="")
-Rel(Cofounderoperator, SwarmPlatform.Launcherthinclient, "Launches keepers and orchestrators", $techn="curator run", $tags="", $link="")
-Rel(Cofounderoperator, SwarmPlatform.SessionHostM1M2, "Lists, parks, restarts; R55 binary swap in the maintenance slot", $techn="CLI (signed control)", $tags="", $link="")
-Rel(Owner, SwarmPlatform.Board, "Confirms flow versions, acts in human-owned states", $techn="task-board trust confirm", $tags="", $link="")
-Rel(SwarmPlatform.Launcherthinclient, SwarmPlatform.Composer, "Asks for one plan (compose-only); compares expect_pin", $techn="curator-run, launch intent", $tags="", $link="")
-Rel(SwarmPlatform.Composer, SwarmPlatform.EnvironmentManager, "Resolves the role profile (sole fragment reader)", $techn="env resolve JSON", $tags="", $link="")
-Rel(SwarmPlatform.Launcherthinclient, SwarmPlatform.ModelRouter, "Routes model and effort", $techn="route()", $tags="", $link="")
-Rel(SwarmPlatform.Launcherthinclient, SwarmPlatform.NetworkProfiles, "Resolves egress profile", $techn="resolve()", $tags="", $link="")
-Rel(SwarmPlatform.Launcherthinclient, SwarmPlatform.CapacityS3, "Slot and per-host gates", $techn="admit_host()", $tags="", $link="")
-Rel(SwarmPlatform.Launcherthinclient, SwarmPlatform.ProductRegistryKeeper, "Reads the versioned project binding", $techn="binding()", $tags="", $link="")
-Rel(SwarmPlatform.Launcherthinclient, SwarmPlatform.SessionHostM1M2, "Hands the composed plan to intake; drives initialize", $techn="ax start --launch-plan contract", $tags="", $link="")
-Rel(SwarmPlatform.Launcherthinclient, SwarmPlatform.RemoteExecutor, "Sends a launch intent with profile_pin and binding pin", $techn="rwh", $tags="", $link="")
-Rel(SwarmPlatform.Launcherthinclient, SwarmPlatform.BridgeM3, "Binds I/O providers at initialize", $techn="bind()", $tags="", $link="")
-Rel(SwarmPlatform.Launcherthinclient, SwarmPlatform.Trust, "Consumes mandate for privileged steps", $techn="mandate consume", $tags="", $link="")
-Rel(SwarmPlatform.SessionHostM1M2, SwarmPlatform.Composer, "Compare-only pin answer on resume; new plan only for rebuild", $techn="compose-only", $tags="", $link="")
-Rel(SwarmPlatform.SessionHostM1M2, SwarmPlatform.CapacityS3, "Rechecks gates before exec; holds the transferred lease", $techn="admit_host/release", $tags="", $link="")
-Rel(SwarmPlatform.SessionHostM1M2, SwarmPlatform.Trust, "Re-verifies grants and revocation at enqueue and dispatch", $techn="verify/granted", $tags="", $link="")
-Rel(SwarmPlatform.SessionHostM1M2, SwarmPlatform.AgentHarnessSession, "Execs and holds the process", $techn="process group", $tags="", $link="")
-Rel(SwarmPlatform.ProductRegistryKeeper, SwarmPlatform.SessionHostM1M2, "Requests restore after reboot (only automatic requester)", $techn="up() -> resume()", $tags="", $link="")
-Rel(SwarmPlatform.BridgeM3, SwarmPlatform.Trust, "Verifies signatures, grants, mandates", $techn="verify/granted", $tags="", $link="")
-Rel(SwarmPlatform.BridgeM3, SwarmPlatform.SessionHostM1M2, "Durable idempotent enqueue; acceptance after host ack", $techn="enqueue(idem_key)", $tags="", $link="")
+SwarmPlatform.AgentHarnessSession --> SwarmPlatform.BridgeM3 <<Relationship-UmVsYXRpb25zaGlw>> : "Agent runs tail commands\n<size:16>[shell tool]</size>"
+SwarmPlatform.BridgeM3 --> MatrixHomeservera2a <<Relationship-UmVsYXRpb25zaGlw>> : "Subscribes and posts\n<size:16>[a2a / Matrix CS API]</size>"
+SwarmPlatform.BridgeM3 --> SwarmPlatform.CapacityS3 <<Relationship-UmVsYXRpb25zaGlw>> : "Checks nudge budget\n<size:16>[acquire()]</size>"
+SwarmPlatform.AgentHarnessSession --> ModelProviders <<Relationship-UmVsYXRpb25zaGlw>> : "Model calls\n<size:16>[HTTPS]</size>"
+SwarmPlatform.AgentHarnessSession --> GitRepositories <<Relationship-UmVsYXRpb25zaGlw>> : "Works in project repo\n<size:16>[git]</size>"
+SwarmPlatform.RemoteExecutor --> RemoteHost <<Relationship-UmVsYXRpb25zaGlw>> : "Target curator-run composes and refuses on pin mismatch; harness turns\n<size:16>[ssh + unix sockets]</size>"
+SwarmPlatform.RemoteExecutor --> SwarmPlatform.RemoteWorkplace <<Relationship-UmVsYXRpb25zaGlw>> : "Runs tool calls inside the remote agent's OS user\n<size:16>[ssh (inbound only) + unix sockets]</size>"
+SwarmPlatform.RemoteExecutor --> SwarmPlatform.SessionHostM1M2 <<Relationship-UmVsYXRpb25zaGlw>> : "Relays turns and output\n<size:16>[adapter over rwh]</size>"
+SwarmPlatform.RemoteWorkplace --> GitRepositories <<Relationship-UmVsYXRpb25zaGlw>> : "Seeds from the exact base SHA, exports patch\n<size:16>[git bundle]</size>"
+RemoteHost --> ModelProviders <<Relationship-UmVsYXRpb25zaGlw>> : "Model calls on remote subscriptions\n<size:16>[HTTPS]</size>"
+SwarmPlatform.ModelRouter --> ModelProviders <<Relationship-UmVsYXRpb25zaGlw>> : "Knows provider capabilities\n<size:16>[catalog]</size>"
+SwarmPlatform.Board --> GitRepositories <<Relationship-UmVsYXRpb25zaGlw>> : "Reads Playbook.json at the default-branch head\n<size:16>[git]</size>"
+SwarmPlatform.Board --> SwarmPlatform.EnvironmentManager <<Relationship-UmVsYXRpb25zaGlw>> : "Validates and resolves the closure and role skills\n<size:16>[curator playbook check]</size>"
+SwarmPlatform.Board --> SwarmPlatform.Trust <<Relationship-UmVsYXRpb25zaGlw>> : "Asks whether a version is confirmed or covered\n<size:16>[confirmed/granted/narrowed]</size>"
+SwarmPlatform.Board --> SwarmPlatform.ProductRegistryKeeper <<Relationship-UmVsYXRpb25zaGlw>> : "Reads role bindings, pins and slots\n<size:16>[binding()]</size>"
+SwarmPlatform.Board --> SwarmPlatform.Launcherthinclient <<Relationship-UmVsYXRpb25zaGlw>> : "Launches the role with the spawn key\n<size:16>[launch(LaunchRequest)]</size>"
+SwarmPlatform.Board --> SwarmPlatform.BridgeM3 <<Relationship-UmVsYXRpb25zaGlw>> : "Publishes goal revisions, receives outcome proposals\n<size:16>[swarm-plugin/1]</size>"
+SwarmPlatform.Board --> SwarmPlatform.CapacityS3 <<Relationship-UmVsYXRpb25zaGlw>> : "Slots, gates and validation FIFO\n<size:16>[acquire/queue]</size>"
+SwarmPlatform.Board --> SwarmPlatform.LaunchDispatcher <<Relationship-UmVsYXRpb25zaGlw>> : "spawn = dispatch(LaunchRequest); RUN-* attached by reconciliation\n<size:16>[dispatch()]</size>"
+SwarmPlatform.LaunchDispatcher --> SwarmPlatform.Trust <<Relationship-UmVsYXRpb25zaGlw>> : "Checks the spawn grant and attenuation-only delegation\n<size:16>[granted()]</size>"
+SwarmPlatform.LaunchDispatcher --> SwarmPlatform.CapacityS3 <<Relationship-UmVsYXRpb25zaGlw>> : "Local capacity: slots, disk, CPU\n<size:16>[admit_host()]</size>"
+SwarmPlatform.LaunchDispatcher --> SwarmPlatform.AgentWorkplace <<Relationship-UmVsYXRpb25zaGlw>> : "Creates and removes OS users, homes, ACLs and firewall rules through the privileged helper\n<size:16>[sudo helper]</size>"
+SwarmPlatform.LaunchDispatcher --> SwarmPlatform.KeyKeeper <<Relationship-UmVsYXRpb25zaGlw>> : "Registers the new UID to its identity path; requests revocation at retire\n<size:16>[register/revoke]</size>"
+SwarmPlatform.LaunchDispatcher --> SwarmPlatform.Launcherthinclient <<Relationship-UmVsYXRpb25zaGlw>> : "Launches as the new OS user\n<size:16>[curator run]</size>"
+SwarmPlatform.SessionHostM1M2 --> SwarmPlatform.AgentWorkplace <<Relationship-UmVsYXRpb25zaGlw>> : "Execs the harness as the agent's OS user\n<size:16>[setuid exec]</size>"
+SwarmPlatform.AgentHarnessSession --> SwarmPlatform.KeyKeeper <<Relationship-UmVsYXRpb25zaGlw>> : "Asks for signatures of its outbound messages; the key never leaves the keeper\n<size:16>[unix socket, peer UID]</size>"
+SwarmPlatform.BridgeM3 --> SwarmPlatform.KeyKeeper <<Relationship-UmVsYXRpb25zaGlw>> : "Signs outbound items on behalf of the posting agent\n<size:16>[unix socket]</size>"
+SwarmPlatform.SessionHostM1M2 --> SwarmPlatform.CredentialBroker <<Relationship-UmVsYXRpb25zaGlw>> : "Resolves the credential source_ref at exec: env token, helper, or shared file\n<size:16>[lease request, peer UID]</size>"
+SwarmPlatform.CredentialBroker --> Owner <<Relationship-UmVsYXRpb25zaGlw>> : "Relays the vendor's re-login flow and lease approvals\n<size:16>[phone confirmation]</size>"
+SwarmPlatform.AgentWorkplace --> SwarmPlatform.NetworkProfiles <<Relationship-UmVsYXRpb25zaGlw>> : "Kernel firewall per UID admits only the message broker and the egress proxy\n<size:16>[pf / nftables]</size>"
+SwarmPlatform.RemoteWorkplace --> SwarmPlatform.BridgeM3 <<Relationship-UmVsYXRpb25zaGlw>> : "Remote agents receive tasks through the mailbox like local ones\n<size:16>[signed messages]</size>"
+Owner --> SwarmPlatform.KeyKeeper <<Relationship-UmVsYXRpb25zaGlw>> : "Confirms the public root once at installation\n<size:16>[client app]</size>"
+Owner --> MatrixHomeservera2a <<Relationship-UmVsYXRpb25zaGlw>> : "Talks to keepers in product spaces"
+Owner --> SwarmPlatform.Trust <<Relationship-UmVsYXRpb25zaGlw>> : "Signs mandates, grants and authoritative envelopes\n<size:16>[mandate CLI]</size>"
+Cofounderoperator --> SwarmPlatform.Launcherthinclient <<Relationship-UmVsYXRpb25zaGlw>> : "Launches keepers and orchestrators\n<size:16>[curator run]</size>"
+Cofounderoperator --> SwarmPlatform.SessionHostM1M2 <<Relationship-UmVsYXRpb25zaGlw>> : "Lists, parks, restarts; R55 binary swap in the maintenance slot\n<size:16>[CLI (signed control)]</size>"
+Owner --> SwarmPlatform.Board <<Relationship-UmVsYXRpb25zaGlw>> : "Confirms flow versions, acts in human-owned states\n<size:16>[task-board trust confirm]</size>"
+SwarmPlatform.Launcherthinclient --> SwarmPlatform.Composer <<Relationship-UmVsYXRpb25zaGlw>> : "Asks for one plan (compose-only); compares expect_pin\n<size:16>[curator-run, launch intent]</size>"
+SwarmPlatform.Composer --> SwarmPlatform.EnvironmentManager <<Relationship-UmVsYXRpb25zaGlw>> : "Resolves the role profile (sole fragment reader)\n<size:16>[env resolve JSON]</size>"
+SwarmPlatform.Launcherthinclient --> SwarmPlatform.ModelRouter <<Relationship-UmVsYXRpb25zaGlw>> : "Routes model and effort\n<size:16>[route()]</size>"
+SwarmPlatform.Launcherthinclient --> SwarmPlatform.NetworkProfiles <<Relationship-UmVsYXRpb25zaGlw>> : "Resolves egress profile\n<size:16>[resolve()]</size>"
+SwarmPlatform.Launcherthinclient --> SwarmPlatform.CapacityS3 <<Relationship-UmVsYXRpb25zaGlw>> : "Slot and per-host gates\n<size:16>[admit_host()]</size>"
+SwarmPlatform.Launcherthinclient --> SwarmPlatform.ProductRegistryKeeper <<Relationship-UmVsYXRpb25zaGlw>> : "Reads the versioned project binding\n<size:16>[binding()]</size>"
+SwarmPlatform.Launcherthinclient --> SwarmPlatform.SessionHostM1M2 <<Relationship-UmVsYXRpb25zaGlw>> : "Hands the composed plan to intake; drives initialize\n<size:16>[ax start --launch-plan contract]</size>"
+SwarmPlatform.Launcherthinclient --> SwarmPlatform.RemoteExecutor <<Relationship-UmVsYXRpb25zaGlw>> : "Sends a launch intent with profile_pin and binding pin\n<size:16>[rwh]</size>"
+SwarmPlatform.Launcherthinclient --> SwarmPlatform.BridgeM3 <<Relationship-UmVsYXRpb25zaGlw>> : "Binds I/O providers at initialize\n<size:16>[bind()]</size>"
+SwarmPlatform.Launcherthinclient --> SwarmPlatform.Trust <<Relationship-UmVsYXRpb25zaGlw>> : "Consumes mandate for privileged steps\n<size:16>[mandate consume]</size>"
+SwarmPlatform.SessionHostM1M2 --> SwarmPlatform.Composer <<Relationship-UmVsYXRpb25zaGlw>> : "Compare-only pin answer on resume; new plan only for rebuild\n<size:16>[compose-only]</size>"
+SwarmPlatform.SessionHostM1M2 --> SwarmPlatform.CapacityS3 <<Relationship-UmVsYXRpb25zaGlw>> : "Rechecks gates before exec; holds the transferred lease\n<size:16>[admit_host/release]</size>"
+SwarmPlatform.SessionHostM1M2 --> SwarmPlatform.Trust <<Relationship-UmVsYXRpb25zaGlw>> : "Re-verifies grants and revocation at enqueue and dispatch\n<size:16>[verify/granted]</size>"
+SwarmPlatform.SessionHostM1M2 --> SwarmPlatform.AgentHarnessSession <<Relationship-UmVsYXRpb25zaGlw>> : "Execs and holds the process\n<size:16>[process group]</size>"
+SwarmPlatform.ProductRegistryKeeper --> SwarmPlatform.SessionHostM1M2 <<Relationship-UmVsYXRpb25zaGlw>> : "Requests restore after reboot (only automatic requester)\n<size:16>[up() -> resume()]</size>"
+SwarmPlatform.BridgeM3 --> SwarmPlatform.Trust <<Relationship-UmVsYXRpb25zaGlw>> : "Verifies signatures, grants, mandates\n<size:16>[verify/granted]</size>"
+SwarmPlatform.BridgeM3 --> SwarmPlatform.SessionHostM1M2 <<Relationship-UmVsYXRpb25zaGlw>> : "Durable idempotent enqueue; acceptance after host ack\n<size:16>[enqueue(idem_key)]</size>"
 
-SHOW_LEGEND(true)
-hide stereotypes
 @enduml

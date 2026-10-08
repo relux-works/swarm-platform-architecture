@@ -3,68 +3,159 @@ title <size:24>Component View: Swarm Platform - Board</size>\n<size:24>Board par
 
 set separator none
 left to right direction
+skinparam ranksep 60
+skinparam nodesep 30
+hide stereotype
 
 <style>
   root {
-    BackgroundColor: #ffffff
-    FontColor: #444444
+    BackgroundColor: #ffffff;
+    FontColor: #444444;
+  }
+  // Element,Component
+  .Element-RWxlbWVudCxDb21wb25lbnQ= {
+    BackgroundColor: #85bbf0;
+    LineColor: #5d82a8;
+    LineStyle: 0;
+    LineThickness: 2;
+    FontColor: #000000;
+    FontSize: 24;
+    HorizontalAlignment: center;
+    Shadowing: 0;
+    MaximumWidth: 450;
+  }
+  // Element,Component,Plugin
+  .Element-RWxlbWVudCxDb21wb25lbnQsUGx1Z2lu {
+    BackgroundColor: #85bbf0;
+    LineColor: #5d82a8;
+    LineStyle: 10-10;
+    LineThickness: 2;
+    FontColor: #000000;
+    FontSize: 24;
+    HorizontalAlignment: center;
+    Shadowing: 0;
+    MaximumWidth: 450;
+  }
+  // Element,Component,Store
+  .Element-RWxlbWVudCxDb21wb25lbnQsU3RvcmU= {
+    BackgroundColor: #85bbf0;
+    LineColor: #5d82a8;
+    LineStyle: 0;
+    LineThickness: 2;
+    FontColor: #000000;
+    FontSize: 24;
+    HorizontalAlignment: center;
+    Shadowing: 0;
+    MaximumWidth: 450;
+  }
+  // Element,Container
+  .Element-RWxlbWVudCxDb250YWluZXI= {
+    BackgroundColor: #438dd5;
+    LineColor: #2e6295;
+    LineStyle: 0;
+    LineThickness: 2;
+    FontColor: #ffffff;
+    FontSize: 24;
+    HorizontalAlignment: center;
+    Shadowing: 0;
+    MaximumWidth: 450;
+  }
+  // Element,Software System,External
+  .Element-RWxlbWVudCxTb2Z0d2FyZSBTeXN0ZW0sRXh0ZXJuYWw= {
+    BackgroundColor: #999999;
+    LineColor: #6b6b6b;
+    LineStyle: 0;
+    LineThickness: 2;
+    FontColor: #ffffff;
+    FontSize: 24;
+    HorizontalAlignment: center;
+    Shadowing: 0;
+    MaximumWidth: 450;
+  }
+  // Relationship
+  .Relationship-UmVsYXRpb25zaGlw {
+    LineThickness: 2;
+    LineStyle: 10-10;
+    LineColor: #444444;
+    FontColor: #444444;
+    FontSize: 24;
+  }
+  // Board
+  .Boundary-Qm9hcmQ= {
+    BackgroundColor: #ffffff;
+    LineColor: #2e6295;
+    LineStyle: 0;
+    LineThickness: 2;
+    FontColor: #ffffff;
+    FontSize: 24;
+    HorizontalAlignment: center;
+    Shadowing: 0;
+  }
+  // Swarm Platform
+  .Boundary-U3dhcm0gUGxhdGZvcm0= {
+    BackgroundColor: #ffffff;
+    LineColor: #0b4884;
+    LineStyle: 0;
+    LineThickness: 2;
+    FontColor: #ffffff;
+    FontSize: 24;
+    HorizontalAlignment: center;
+    Shadowing: 0;
   }
 </style>
 
-!include <C4/C4>
-!include <C4/C4_Context>
-!include <C4/C4_Container>
-!include <C4/C4_Component>
+rectangle "==Git Repositories\n<size:16>[Software System]</size>\n\nOne repo per project" <<Element-RWxlbWVudCxTb2Z0d2FyZSBTeXN0ZW0sRXh0ZXJuYWw=>> as GitRepositories
 
-System(GitRepositories, "Git Repositories", $descr="One repo per project", $tags="", $link="")
-
-System_Boundary("SwarmPlatform_boundary", "Swarm Platform", $tags="") {
-  Container_Boundary("SwarmPlatform.Board_boundary", "Board", $tags="") {
-    ComponentDb(SwarmPlatform.Board.B1TaskStore, "B1 Task Store", $techn="task-board pkg/board records", $descr="Elements, status records (flow_digest, flow_generation, profile_pin), goal revisions, transition intents, resources, activity", $tags="", $link="")
-    Component(SwarmPlatform.Board.KernelGuardskguard, "Kernel Guards (kguard)", $techn="task-board kernel", $descr="kernel-policy/1 predicates K1-K8, checked in every mutation below configurable actions; versioned with the binary", $tags="", $link="")
-    Component(SwarmPlatform.Board.B2FlowConfigandEngine, "B2 Flow Config and Engine", $techn="curator-playbook kernel seam", $descr="Loads Playbook.json, narrow-checks the resolved closure, keeps the version in force and generation, turns transitions into proposals", $tags="", $link="")
-    Component(SwarmPlatform.Board.DeliveryModule, "Delivery Module", $techn="B2 module plugin", $descr="Configurable guards, actions and events for development; kernel CR, integrate and land operations stay under kguard", $tags="", $link="")
-    Component(SwarmPlatform.Board.B3RoleRouter, "B3 Role Router", $techn="Go", $descr="Resolves the owner role of (type, state) to a pinned role profile and a LaunchRequest, a standing session slot, a human notice, a tool or a process", $tags="", $link="")
-    Component(SwarmPlatform.Board.B4Spawn, "B4 Spawn", $techn="Go client of the launcher", $descr="spawn with an idempotent spawn key through the launcher; attaches RUN-* by reconciliation; never execs", $tags="", $link="")
-    Component(SwarmPlatform.Board.B5BoardGoalBinding, "B5 Board Goal Binding", $techn="Board component, swarm-plugin/1 client", $descr="Publishes B1 goal revisions; turns outcome proposals into transition requests; blocked becomes a notice", $tags="", $link="")
-    Component(SwarmPlatform.Board.B6ValidationandLimits, "B6 Validation and Limits", $techn="S3 client", $descr="Spawn slots, per-host gates and the validation FIFO; the board side of S3", $tags="", $link="")
+rectangle "Swarm Platform\n<size:16>[Software System]</size>" <<Boundary-U3dhcm0gUGxhdGZvcm0=>> {
+  rectangle "Board\n<size:16>[Container: task-board kernel + curator-playbook]</size>" <<Boundary-Qm9hcmQ=>> {
+    database "==B1 Task Store\n<size:16>[Component: task-board pkg/board records]</size>\n\nElements, status records (flow_digest, flow_generation, profile_pin), goal revisions, transition intents, resources, activity" <<Element-RWxlbWVudCxDb21wb25lbnQsU3RvcmU=>> as SwarmPlatform.Board.B1TaskStore
+    rectangle "==Kernel Guards (kguard)\n<size:16>[Component: task-board kernel]</size>\n\nkernel-policy/1 predicates K1-K8, checked in every mutation below configurable actions; versioned with the binary" <<Element-RWxlbWVudCxDb21wb25lbnQ=>> as SwarmPlatform.Board.KernelGuardskguard
+    rectangle "==B2 Flow Config and Engine\n<size:16>[Component: curator-playbook kernel seam]</size>\n\nLoads Playbook.json, narrow-checks the resolved closure, keeps the version in force and generation, turns transitions into proposals" <<Element-RWxlbWVudCxDb21wb25lbnQ=>> as SwarmPlatform.Board.B2FlowConfigandEngine
+    rectangle "==Delivery Module\n<size:16>[Component: B2 module plugin]</size>\n\nConfigurable guards, actions and events for development; kernel CR, integrate and land operations stay under kguard" <<Element-RWxlbWVudCxDb21wb25lbnQsUGx1Z2lu>> as SwarmPlatform.Board.DeliveryModule
+    rectangle "==B3 Role Router\n<size:16>[Component: Go]</size>\n\nResolves the owner role of (type, state) to a pinned role profile and a LaunchRequest, a standing session slot, a human notice, a tool or a process" <<Element-RWxlbWVudCxDb21wb25lbnQ=>> as SwarmPlatform.Board.B3RoleRouter
+    rectangle "==B4 Spawn\n<size:16>[Component: Go client of the launcher]</size>\n\nspawn with an idempotent spawn key through the launcher; attaches RUN-* by reconciliation; never execs" <<Element-RWxlbWVudCxDb21wb25lbnQ=>> as SwarmPlatform.Board.B4Spawn
+    rectangle "==B5 Board Goal Binding\n<size:16>[Component: Board component, swarm-plugin/1 client]</size>\n\nPublishes B1 goal revisions; turns outcome proposals into transition requests; blocked becomes a notice" <<Element-RWxlbWVudCxDb21wb25lbnQsUGx1Z2lu>> as SwarmPlatform.Board.B5BoardGoalBinding
+    rectangle "==B6 Validation and Limits\n<size:16>[Component: S3 client]</size>\n\nSpawn slots, per-host gates and the validation FIFO; the board side of S3" <<Element-RWxlbWVudCxDb21wb25lbnQ=>> as SwarmPlatform.Board.B6ValidationandLimits
   }
 
-  Container(SwarmPlatform.BridgeM3, "Bridge (M3)", $techn="agent-session-bridge", $descr="Hosts provider processes; trust gate; durable bridge-local admission; host enqueue; audience-checked outbox; tails", $tags="", $link="")
-  Container(SwarmPlatform.Trust, "Trust", $techn="mandate CLI + library", $descr="curator-trust + mandates: exact-byte verification, grants, revocation snapshots, capability tokens; assurance mode T (mode S not claimed)", $tags="", $link="")
-  Container(SwarmPlatform.CapacityS3, "Capacity (S3)", $techn="extracted from task-board", $descr="Slots, per-host gates (disk, CPU idle, build lock, syspolicyd), lease transfer, validation FIFO (board part B6)", $tags="", $link="")
-  Container(SwarmPlatform.ProductRegistryKeeper, "Product Registry / Keeper", $techn="curator-keeper registry", $descr="Products, projects, versioned project bindings (hosts, base, jail, egress, rooms, role bindings with slots), up after reboot", $tags="", $link="")
-  Container(SwarmPlatform.EnvironmentManager, "Environment Manager", $techn="Curator + skill-registry", $descr="Role profiles, skills, MCP, command environment, managed tool homes, launch-env fragments (v3, then v4); curator playbook check", $tags="", $link="")
-  Container(SwarmPlatform.Launcherthinclient, "Launcher (thin client)", $techn="curator run (canonical) / swarm launch (optional wrapper)", $descr="Launch transaction: prepare, capacity, compose, compare expect_pin, admit, start, initialize, ready, with compensation. Never reads a fragment or store content, spells a flag, execs or holds", $tags="", $link="")
+  rectangle "==Bridge (M3)\n<size:16>[Container: agent-session-bridge]</size>\n\nHosts provider processes; trust gate; durable bridge-local admission; host enqueue; audience-checked outbox; tails" <<Element-RWxlbWVudCxDb250YWluZXI=>> as SwarmPlatform.BridgeM3
+  rectangle "==Trust\n<size:16>[Container: mandate CLI + library]</size>\n\ncurator-trust + mandates: exact-byte verification, grants with attenuation-only delegation, revocation snapshots, capability tokens; assurance mode T today, mode S through OS-user isolation (v1.3)" <<Element-RWxlbWVudCxDb250YWluZXI=>> as SwarmPlatform.Trust
+  rectangle "==Launch Dispatcher\n<size:16>[Container: Go daemon]</size>\n\nOptional module: run accounting (ids, status, wait, cancel, reconcile after a crash), local host capacity, OS-user lifecycle through one privileged helper; checks the spawn grant (attenuation only); the board's spawn calls it; without it the orchestrator calls the launcher directly" <<Element-RWxlbWVudCxDb250YWluZXI=>> as SwarmPlatform.LaunchDispatcher
+  rectangle "==Capacity (S3)\n<size:16>[Container: extracted from task-board]</size>\n\nSlots, per-host gates (disk, CPU idle, build lock, syspolicyd), lease transfer, validation FIFO (board part B6)" <<Element-RWxlbWVudCxDb250YWluZXI=>> as SwarmPlatform.CapacityS3
+  rectangle "==Product Registry / Keeper\n<size:16>[Container: curator-keeper registry]</size>\n\nProducts, projects, versioned project bindings (hosts, base, remote workplace, egress, rooms, role bindings with slots, team), up after reboot" <<Element-RWxlbWVudCxDb250YWluZXI=>> as SwarmPlatform.ProductRegistryKeeper
+  rectangle "==Environment Manager\n<size:16>[Container: Curator + skill-registry]</size>\n\nRole profiles, skills, MCP, command environment, managed tool homes, launch-env fragments (v3, then v4); curator playbook check" <<Element-RWxlbWVudCxDb250YWluZXI=>> as SwarmPlatform.EnvironmentManager
+  rectangle "==Launcher (thin client)\n<size:16>[Container: curator run (canonical) / swarm launch (optional wrapper)]</size>\n\nLaunch transaction: prepare, capacity, compose, compare expect_pin, admit, start, initialize, ready, with compensation. Never reads a fragment or store content, spells a flag, execs or holds" <<Element-RWxlbWVudCxDb250YWluZXI=>> as SwarmPlatform.Launcherthinclient
 }
 
-Rel(SwarmPlatform.BridgeM3, SwarmPlatform.CapacityS3, "Checks nudge budget", $techn="acquire()", $tags="", $link="")
-Rel(SwarmPlatform.Board.B2FlowConfigandEngine, GitRepositories, "Reads Playbook.json at the default-branch head", $techn="git", $tags="", $link="")
-Rel(SwarmPlatform.Board.B2FlowConfigandEngine, SwarmPlatform.EnvironmentManager, "Validates and resolves the closure and role skills", $techn="curator playbook check", $tags="", $link="")
-Rel(SwarmPlatform.Board.B2FlowConfigandEngine, SwarmPlatform.Board.KernelGuardskguard, "Narrow-checks the resolved closure against kernel-policy/1", $techn="narrow_check()", $tags="", $link="")
-Rel(SwarmPlatform.Board.B2FlowConfigandEngine, SwarmPlatform.Trust, "Asks whether a version is confirmed or covered", $techn="confirmed/granted/narrowed", $tags="", $link="")
-Rel(SwarmPlatform.Board.B2FlowConfigandEngine, SwarmPlatform.Board.B1TaskStore, "Commits proposals with expected rev and generation", $techn="write_status(proposal)", $tags="", $link="")
-Rel(SwarmPlatform.Board.B1TaskStore, SwarmPlatform.Board.KernelGuardskguard, "Checks K1-K8 in the same transaction", $techn="kguard()", $tags="", $link="")
-Rel(SwarmPlatform.Board.B2FlowConfigandEngine, SwarmPlatform.Board.DeliveryModule, "Evaluates module guards and actions", $techn="guard/action/event", $tags="", $link="")
-Rel(SwarmPlatform.Board.DeliveryModule, SwarmPlatform.Board.KernelGuardskguard, "CR, integrate and land go through kernel operations", $techn="cr.*/integrate/land", $tags="", $link="")
-Rel(SwarmPlatform.Board.B2FlowConfigandEngine, SwarmPlatform.Board.B3RoleRouter, "Entered a state with spawn.owner", $techn="flow.entered", $tags="", $link="")
-Rel(SwarmPlatform.Board.B3RoleRouter, SwarmPlatform.ProductRegistryKeeper, "Reads role bindings, pins and slots", $techn="binding()", $tags="", $link="")
-Rel(SwarmPlatform.Board.B3RoleRouter, SwarmPlatform.Board.B4Spawn, "Agent owner: LaunchRequest", $techn="spawn()", $tags="", $link="")
-Rel(SwarmPlatform.Board.B3RoleRouter, SwarmPlatform.Board.B5BoardGoalBinding, "Standing owner or human owner: goal revision or notice", $techn="publish()", $tags="", $link="")
-Rel(SwarmPlatform.Board.B4Spawn, SwarmPlatform.Launcherthinclient, "Launches the role with the spawn key", $techn="launch(LaunchRequest)", $tags="", $link="")
-Rel(SwarmPlatform.Board.B4Spawn, SwarmPlatform.Board.B1TaskStore, "Attaches RUN-* by reconciliation", $techn="attach()", $tags="", $link="")
-Rel(SwarmPlatform.Board.B5BoardGoalBinding, SwarmPlatform.BridgeM3, "Publishes goal revisions, receives outcome proposals", $techn="swarm-plugin/1", $tags="", $link="")
-Rel(SwarmPlatform.Board.B5BoardGoalBinding, SwarmPlatform.Board.B2FlowConfigandEngine, "Done proposal: transition request", $techn="propose(actor=run)", $tags="", $link="")
-Rel(SwarmPlatform.Board.B5BoardGoalBinding, SwarmPlatform.Board.B1TaskStore, "Goal revisions with handoff refs; notices", $techn="goal.revise/append", $tags="", $link="")
-Rel(SwarmPlatform.Board.DeliveryModule, SwarmPlatform.Board.B6ValidationandLimits, "Queues check sets", $techn="queue()", $tags="", $link="")
-Rel(SwarmPlatform.Board.B6ValidationandLimits, SwarmPlatform.CapacityS3, "Slots, gates and validation FIFO", $techn="acquire/queue", $tags="", $link="")
-Rel(SwarmPlatform.Board.KernelGuardskguard, GitRepositories, "Integrates accepted revisions (signed exact-head ff)", $techn="git", $tags="", $link="")
-Rel(SwarmPlatform.Launcherthinclient, SwarmPlatform.CapacityS3, "Slot and per-host gates", $techn="admit_host()", $tags="", $link="")
-Rel(SwarmPlatform.Launcherthinclient, SwarmPlatform.ProductRegistryKeeper, "Reads the versioned project binding", $techn="binding()", $tags="", $link="")
-Rel(SwarmPlatform.Launcherthinclient, SwarmPlatform.BridgeM3, "Binds I/O providers at initialize", $techn="bind()", $tags="", $link="")
-Rel(SwarmPlatform.Launcherthinclient, SwarmPlatform.Trust, "Consumes mandate for privileged steps", $techn="mandate consume", $tags="", $link="")
-Rel(SwarmPlatform.BridgeM3, SwarmPlatform.Trust, "Verifies signatures, grants, mandates", $techn="verify/granted", $tags="", $link="")
+SwarmPlatform.BridgeM3 --> SwarmPlatform.CapacityS3 <<Relationship-UmVsYXRpb25zaGlw>> : "Checks nudge budget\n<size:16>[acquire()]</size>"
+SwarmPlatform.Board.B2FlowConfigandEngine --> GitRepositories <<Relationship-UmVsYXRpb25zaGlw>> : "Reads Playbook.json at the default-branch head\n<size:16>[git]</size>"
+SwarmPlatform.Board.B2FlowConfigandEngine --> SwarmPlatform.EnvironmentManager <<Relationship-UmVsYXRpb25zaGlw>> : "Validates and resolves the closure and role skills\n<size:16>[curator playbook check]</size>"
+SwarmPlatform.Board.B2FlowConfigandEngine --> SwarmPlatform.Board.KernelGuardskguard <<Relationship-UmVsYXRpb25zaGlw>> : "Narrow-checks the resolved closure against kernel-policy/1\n<size:16>[narrow_check()]</size>"
+SwarmPlatform.Board.B2FlowConfigandEngine --> SwarmPlatform.Trust <<Relationship-UmVsYXRpb25zaGlw>> : "Asks whether a version is confirmed or covered\n<size:16>[confirmed/granted/narrowed]</size>"
+SwarmPlatform.Board.B2FlowConfigandEngine --> SwarmPlatform.Board.B1TaskStore <<Relationship-UmVsYXRpb25zaGlw>> : "Commits proposals with expected rev and generation\n<size:16>[write_status(proposal)]</size>"
+SwarmPlatform.Board.B1TaskStore --> SwarmPlatform.Board.KernelGuardskguard <<Relationship-UmVsYXRpb25zaGlw>> : "Checks K1-K8 in the same transaction\n<size:16>[kguard()]</size>"
+SwarmPlatform.Board.B2FlowConfigandEngine --> SwarmPlatform.Board.DeliveryModule <<Relationship-UmVsYXRpb25zaGlw>> : "Evaluates module guards and actions\n<size:16>[guard/action/event]</size>"
+SwarmPlatform.Board.DeliveryModule --> SwarmPlatform.Board.KernelGuardskguard <<Relationship-UmVsYXRpb25zaGlw>> : "CR, integrate and land go through kernel operations\n<size:16>[cr.*/integrate/land]</size>"
+SwarmPlatform.Board.B2FlowConfigandEngine --> SwarmPlatform.Board.B3RoleRouter <<Relationship-UmVsYXRpb25zaGlw>> : "Entered a state with spawn.owner\n<size:16>[flow.entered]</size>"
+SwarmPlatform.Board.B3RoleRouter --> SwarmPlatform.ProductRegistryKeeper <<Relationship-UmVsYXRpb25zaGlw>> : "Reads role bindings, pins and slots\n<size:16>[binding()]</size>"
+SwarmPlatform.Board.B3RoleRouter --> SwarmPlatform.Board.B4Spawn <<Relationship-UmVsYXRpb25zaGlw>> : "Agent owner: LaunchRequest\n<size:16>[spawn()]</size>"
+SwarmPlatform.Board.B3RoleRouter --> SwarmPlatform.Board.B5BoardGoalBinding <<Relationship-UmVsYXRpb25zaGlw>> : "Standing owner or human owner: goal revision or notice\n<size:16>[publish()]</size>"
+SwarmPlatform.Board.B4Spawn --> SwarmPlatform.Launcherthinclient <<Relationship-UmVsYXRpb25zaGlw>> : "Launches the role with the spawn key\n<size:16>[launch(LaunchRequest)]</size>"
+SwarmPlatform.Board.B4Spawn --> SwarmPlatform.Board.B1TaskStore <<Relationship-UmVsYXRpb25zaGlw>> : "Attaches RUN-* by reconciliation\n<size:16>[attach()]</size>"
+SwarmPlatform.Board.B5BoardGoalBinding --> SwarmPlatform.BridgeM3 <<Relationship-UmVsYXRpb25zaGlw>> : "Publishes goal revisions, receives outcome proposals\n<size:16>[swarm-plugin/1]</size>"
+SwarmPlatform.Board.B5BoardGoalBinding --> SwarmPlatform.Board.B2FlowConfigandEngine <<Relationship-UmVsYXRpb25zaGlw>> : "Done proposal: transition request\n<size:16>[propose(actor=run)]</size>"
+SwarmPlatform.Board.B5BoardGoalBinding --> SwarmPlatform.Board.B1TaskStore <<Relationship-UmVsYXRpb25zaGlw>> : "Goal revisions with handoff refs; notices\n<size:16>[goal.revise/append]</size>"
+SwarmPlatform.Board.DeliveryModule --> SwarmPlatform.Board.B6ValidationandLimits <<Relationship-UmVsYXRpb25zaGlw>> : "Queues check sets\n<size:16>[queue()]</size>"
+SwarmPlatform.Board.B6ValidationandLimits --> SwarmPlatform.CapacityS3 <<Relationship-UmVsYXRpb25zaGlw>> : "Slots, gates and validation FIFO\n<size:16>[acquire/queue]</size>"
+SwarmPlatform.Board.KernelGuardskguard --> GitRepositories <<Relationship-UmVsYXRpb25zaGlw>> : "Integrates accepted revisions (signed exact-head ff)\n<size:16>[git]</size>"
+SwarmPlatform.Board.B4Spawn --> SwarmPlatform.LaunchDispatcher <<Relationship-UmVsYXRpb25zaGlw>> : "spawn = dispatch(LaunchRequest); RUN-* attached by reconciliation\n<size:16>[dispatch()]</size>"
+SwarmPlatform.LaunchDispatcher --> SwarmPlatform.Trust <<Relationship-UmVsYXRpb25zaGlw>> : "Checks the spawn grant and attenuation-only delegation\n<size:16>[granted()]</size>"
+SwarmPlatform.LaunchDispatcher --> SwarmPlatform.CapacityS3 <<Relationship-UmVsYXRpb25zaGlw>> : "Local capacity: slots, disk, CPU\n<size:16>[admit_host()]</size>"
+SwarmPlatform.LaunchDispatcher --> SwarmPlatform.Launcherthinclient <<Relationship-UmVsYXRpb25zaGlw>> : "Launches as the new OS user\n<size:16>[curator run]</size>"
+SwarmPlatform.Launcherthinclient --> SwarmPlatform.CapacityS3 <<Relationship-UmVsYXRpb25zaGlw>> : "Slot and per-host gates\n<size:16>[admit_host()]</size>"
+SwarmPlatform.Launcherthinclient --> SwarmPlatform.ProductRegistryKeeper <<Relationship-UmVsYXRpb25zaGlw>> : "Reads the versioned project binding\n<size:16>[binding()]</size>"
+SwarmPlatform.Launcherthinclient --> SwarmPlatform.BridgeM3 <<Relationship-UmVsYXRpb25zaGlw>> : "Binds I/O providers at initialize\n<size:16>[bind()]</size>"
+SwarmPlatform.Launcherthinclient --> SwarmPlatform.Trust <<Relationship-UmVsYXRpb25zaGlw>> : "Consumes mandate for privileged steps\n<size:16>[mandate consume]</size>"
+SwarmPlatform.BridgeM3 --> SwarmPlatform.Trust <<Relationship-UmVsYXRpb25zaGlw>> : "Verifies signatures, grants, mandates\n<size:16>[verify/granted]</size>"
 
-SHOW_LEGEND(true)
-hide stereotypes
 @enduml
