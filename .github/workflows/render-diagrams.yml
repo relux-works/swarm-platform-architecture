@@ -2,7 +2,7 @@ name: render diagrams
 on:
   workflow_dispatch:
   pull_request:
-    paths: ['diagrams/**']
+    paths: ['diagrams/**', '.github/workflows/render-diagrams.yml']
 jobs:
   render:
     runs-on: ubuntu-latest
