@@ -1,45 +1,74 @@
 @startuml remote-workplace-attach
 !theme plain
-title Remote workplace (v1.3): the remote harness attaches by SSH into its own OS user on our host; tool calls run inside that boundary; tasks arrive through the mailbox; no commands flow towards the remote machine
+' Source: relux-works/curator-spec PR #134 (CIP-0009 revision 2, commit 5100b46), cips/diagrams; adapted name and title only.
+title Remote workplace (v1.3, after Curator CIP-0009 revision 2): a remote worker turn: the harness has no local tools; the relay (harness identity) forwards to the bridge service (bridge identity), which carries every tool call and the mailbox over ONE SSH connection from the donor to our host; our host never connects back
 
-participant "Remote harness\n(model on the remote side)" as RH
-participant "SSH daemon\n(our host)" as SSHD
-participant "Remote workplace\n(OS user ext_k: home, firewall)" as WP
-participant "rwh tool runner\n(inside ext_k)" as RW
+box "Donor machine: harness identity (sandboxed, egress = proxy only)" #WhiteSmoke
+  participant "Harness\n(Claude / Codex / Muse, lockdown plan)" as H
+  participant "swarma-remote-tools\n(stdio relay; no keys, no network)" as MCP
+  participant "Provider proxy" as PX
+end box
+box "Donor machine: bridge identity (keys, audit, cursors)" #WhiteSmoke
+  participant "Bridge service\n(supervisor + SSH client + signer + admission)" as SUP
+end box
+box "Our host" #WhiteSmoke
+  participant "sshd + forced command\nswarma-rb-exec (workplace user)" as RB
+  participant "Workplace\n(OS-user backend, swarma-workplace-exec/1)" as WP
+  participant "Bridge\n(broker, mailbox, M3)" as BR
+end box
 participant "Orchestrator" as O
-participant "Bridge\n(broker, mailbox)" as BR
-participant "Task core (board)" as B
-database "Carrier" as MX
 
-== attach (connection towards our host only) ==
-RH -> SSHD: ssh ext_k@host, key K (pinned in authorized_keys);\nhost key fingerprint checked against the credential package
-SSHD -> WP: session as uid ext_k; forced command: rwh tool runner
-WP -> RW: start inside the user boundary\n(firewall: only broker + egress proxy; no other egress)
-RW --> RH: tool channel open (framed over the SSH session)
-note right of RW
-  Only tool execution crosses this channel.
-  Our side never opens a connection to the
-  remote machine and never sends commands into it.
-end note
+== standing connection ==
+SUP -> RB: ssh workplace-user@host with K_ssh; host key checked against the pin on EVERY connection (no TOFU)
+RB --> SUP: hello {versions:[1]} / swarma-rb/1 channel open (bounded CBOR frames, flow credits)
+SUP -> RB: policy.get
+RB --> SUP: workplace policy {tools, write scope, network, limits, env_allow} -> effective tool set
+note right of RB: Match block: root-owned AuthorizedKeysFile, restrict, no forwarding, no PTY,\nno user rc/env; forced command by absolute path; reconnect is the donor side's job
 
-== task ==
-O -> B: snapshot of the task for K (projection of one element)
-O -> BR: signed message to K: "task X, snapshot ref" (grant: session.input? no — post to K's mailbox)
-BR -> BR: verify signature, grant, decision guard; mailbox record
-BR -> MX: doorbell to K's identity
-RH -> BR: mailbox read (through its tool, over the carrier) → body + verification record
-RH -> RH: agent loop decides to take the task
+== launch ==
+SUP -> SUP: obtain the composed plan from the construction site (agents-management);\ncheck expect_pin, tool_posture=lockdown, permissions=remote-auto, policy generation, qualified tuple;\nvalidate the expanded launch against the generated policy; resolve credential_binding/1
+SUP -> H: start as the harness identity under the Seatbelt profile\n(e.g. claude --restricted --tools "" --strict-mcp-config --mcp-config <protected> --settings <protected>\n--setting-sources "" --disable-slash-commands --permission-prompts none --allowedTools mcp__swarma-remote-tools__*;\ntoken in the harness environment only, CIP-0010)
+H -> MCP: MCP initialize; tools/list = effective set (policy intersection)
+
+== task arrives ==
+O -> BR: signed task message to the worker (snapshot of one element)
+BR -> BR: verify signature, grant, decision guard, fence; mailbox record; cursor++
+BR -> RB: mailbox.notify {message_id, cursor} (advisory)
+RB -> SUP: frame mailbox.notify
+SUP -> RB: mailbox.read {from_cursor}
+RB -> BR: read
+BR --> RB: items + verification records
+RB --> SUP: frames
+SUP -> SUP: DONOR-SIDE ADMISSION: verification record present, target binding = this worker,\nunexpired, not fenced/revoked, delivery mode allowed; dedup by message_id; persist; cursor++
+SUP -> H: next turn through the session-input adapter: "validated message <id>" + snapshot
+SUP -> RB: mailbox.applied {message_id} (application receipt, distinct from the transport reply)
 
 == work ==
-loop tool calls
-  RH -> RW: tool call (bash, git, files) over the SSH channel
-  RW -> WP: execute as ext_k; egress only through the profile proxy
-  RW --> RH: result
+loop each tool call
+  H -> MCP: tools/call bash {cmd, cwd, timeout}
+  MCP -> SUP: forward over the relay socket (peer credentials checked)
+  SUP -> SUP: audit line {tool, args_sha256, bytes, at}; budget counters (trusted side)
+  SUP -> RB: frame exec {id, op_key, cmd, cwd, env (env_allow only), timeout_s <= policy, max_output_bytes <= policy, lease_s}
+  RB -> WP: run as the workplace user in its own process group with a lease; audit {who, what, when, policy id}
+  WP --> RB: stdout/stderr frames (seq), exit
+  RB --> SUP: frames (result cached by op_key for 10 min)
+  SUP --> MCP: result
+  MCP --> H: tool result
 end
-RH -> BR: post result (signed by K); audience projection → thread
-BR -> B: outcome proposal for the element
+H -> PX: model API calls (the only egress of the harness identity)
+alt the model requests a built-in tool (Bash, Edit, WebFetch ...)
+  H -> H: harness returns an error tool result (tool not available);\nthe tripwire logs the name after dispatch and may end the turn
+end
+alt SSH channel drops mid-turn
+  SUP -> SUP: pause the turn loop; running turn continues to its deadline;\ntool calls fail with channel_down (retryable); result post queued durably with its op_key
+  SUP -> RB: reconnect with backoff; host key rechecked; catch up from the durable cursor;\nreplay-safe: cached result or unknown_result, never a second effect
+end
 
-== retire ==
-O -> O: revoke K's workplace (grant user.create)
-note right of O: archive home, remove authorized_keys,\ndelete user ext_k, remove firewall rules;\nK's identity stays pinned unless revoked
+== result ==
+H -> MCP: tools/call mailbox_post {binding, text} (offered only when the policy grants it)
+MCP -> SUP: forward
+SUP -> SUP: build the FINAL envelope (canonical bytes; audience/thread from the task record);\nsign with K_sig (never leaves the bridge identity)
+SUP -> RB: frame mailbox.post {op_key, envelope_bytes, signature}
+RB -> BR: verify K_sig signature, grant, freshness; admit
+BR -> O: carry the bytes UNCHANGED under the worker's carrier account (distinct authority, audited) -> outcome proposal
 @enduml

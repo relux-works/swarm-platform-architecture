@@ -1,43 +1,61 @@
 @startuml external-agent-onboarding
 !theme plain
-title External agent onboarding (v1.3): self-signed certificate, verification and pin, root-signed admission, encrypted credential package, optional workplace
+' Source: relux-works/curator-spec PR #134 (CIP-0009 revision 2, commit 5100b46), cips/diagrams; adapted name and title only.
+title External agent onboarding (v1.3, after Curator CIP-0009 revision 2): remote worker on a donor machine, first deployment: one invitation, one command; two OS identities; three role-separated keys owned by the bridge identity; the posture is locked by the donor (the machine's owner)
 
-participant "External agent\n(other org / machine)" as X
-actor "Operator\n(or orchestrator with onboard grant\n+ operator confirmation)" as OP
-participant "Trust registry\n(keys, grants, revocations)" as T
-participant "Key keeper\n(root)" as KK
-participant "Launch dispatcher" as D
-participant "Privileged helper" as PH
-participant "Bridge\n(broker, mailbox)" as BR
-database "Carrier\n(Matrix / XMPP)" as MX
+actor "Donor (the machine's owner)" as ADM
+participant "curator remote-worker init\n(donor install)" as C
+participant "Privileged helper\n(sudoers: this absolute path only;\nclosed schema; journal + rollback)" as PH
+participant "Bridge identity\nswarma-rb-<project>\n(keys, config, audit)" as B
+participant "Harness identity\nswarma-rw-<project>\n(managed home, scratch)" as U
+database "DNS (DNSSEC)\nTXT _swarma, SSHFP, TLSA\n(cross-check)" as DNS
+participant "Join point\n(our host, HTTPS: challenge, cert, collect)" as JP
+actor "Operator (our side)\nor orchestrator with onboard grant" as OP
+participant "Trust registry + key keeper\n(our host)" as T
 
-== 1. introduction ==
-X -> X: generate key pair; self-signed certificate\n{public key, name, role, contact, validity}
-X -> OP: certificate over an out-of-band channel
-OP -> OP: verify the self-signature (proves key possession);\nconfirm the fingerprint over a second channel (voice, phone)
-note right of OP
-  MITM defence: the fingerprint is confirmed
-  out of band before anything is pinned;
-  every later message is signed over exact bytes.
-end note
-OP -> T: pin public key as external identity {name, role}
-OP -> KK: sign admission record "external key K admitted with role R"
-KK --> T: root-signed admission record stored
+== 1. invitation ==
+OP -> ADM: swarma-invitation/1 {invitation_id, join point, root fingerprint,\nSSH host key fingerprint, project, role, expires, one-use random code}\nover a second channel (the code is a short-lived bootstrap secret)
 
-== 2. grants ==
-OP -> T: grants for K: post to rooms[], read mailbox of ...,\n(optionally) session.input on a named orchestrator; expiry; delegable: no
+== 2. local provisioning (transactional) ==
+ADM -> C: curator remote-worker init <invitation>
+C -> C: refuse unsupported host; verify the release manifest of /opt/swarma/<release>
+C -> PH: create-worker <label>: two accounts (allocated UIDs), homes,\negress anchor by UID, Seatbelt profile (read boundary), launchd daemon unit
+PH --> C: journal entry per step (rollback on failure)
+C -> B: generate K_sig (Ed25519), K_enc (X25519), K_ssh (Ed25519); 0600, bridge-owned
+B -> B: enrolment certificate {K_sig, K_enc, K_ssh, name, role, invitation_id, expires}\nself-signed by K_sig; fingerprint = SHA-256(certificate)
+C --> ADM: show fingerprint F
 
-== 3. credential package ==
-OP -> OP: package {carrier endpoint, identity, rooms, tokens,\nboard endpoint and scope, our root public key, host SSH fingerprint}
-OP -> X: package encrypted to K (hybrid: X25519 + AEAD), signed by the operator
-X -> X: decrypt; verify the operator's signature against our root;\nconfigure its tools (mailbox client, carrier identity)
-X -> MX: join rooms as the issued identity
-X -> BR: first signed message "ready" (verified: signature, pin, grant)
+== 3. join (see join-handshake for the transcript) ==
+C -> JP: POST /join/challenge {invitation_id}
+JP --> C: server challenge (bound to the invitation, 5 min, attempt counter)
+C -> DNS: TXT _swarma, SSHFP, TLSA (only through a trusted validator)
+alt secure and equal to the invitation
+  C -> C: record "dns: secure, matches"
+else bogus
+  C --> ADM: refused{dns_bogus}
+else indeterminate (no trusted validator)
+  C -> C: record "dns: indeterminate; pin bootstrap only"
+end
+C -> JP: POST /join/cert {swarma-join/1 transcript, sig_K_sig, code} (TLS pinned)
+JP -> JP: code (constant time), signature, challenge, expiry;\nconsume invitation atomically (tombstone); rate limit
+JP -> OP: pending enrolment: fingerprint F, name, role
+OP -> ADM: read back F over the second channel
+alt F differs
+  OP -> JP: reject
+  JP --> C: refused
+else F matches
+  OP -> T: pin K_sig, K_enc, K_ssh; root-signed admission "K admitted with role R";\ngrants: post to worker thread, read own mailbox, no delegation, expiry
+  OP -> OP: swarma-credential-package/1 {root pubkey, operator cert (root-signed), host,\nSSH host key, workplace user, binding digest, qualified tuple, policy generation, expiry}\nAEAD to K_enc (X25519 + HKDF + ChaCha20-Poly1305), AAD = transcript digest, signed by the operator cert
+  OP -> JP: package ready for <invitation_id>
+  C -> JP: POST /join/collect {invitation_id, sig_K_sig(second challenge)}
+  JP --> C: package
+  C -> B: decrypt with K_enc; verify operator cert against the pinned root;\nverify package signature and AAD
+  C -> B: write LOCKED machine config: tool_posture=lockdown, permissions=remote-auto (pair),\npolicy_generation, mcp_package_allowlist=[canonical source of swarma-remote-tools],\npassable_env_names=[], qualified tuple, binding, sandbox revision
+  C -> U: install the relay declaration into profile remote-worker (absolute command path)
+  C --> ADM: registered; waiting for tasks (status, stop, leave, purge available)
+end
 
-== 4. optional workplace on our host ==
-OP -> D: provision workplace for K (grant user.create)
-D -> PH: create user ext_k: home, firewall (only broker + proxy; inbound SSH),\nauthorized_keys = K's SSH public key
-PH --> D: uid
-D -> T: bind workplace ext_k -> identity K
-note right of D: see remote-workplace-attach for the connection
+== 4. workplace on our host ==
+OP -> T: provision workplace for K (dispatcher, grant user.create): OS user,\nroot-owned AuthorizedKeysFile entry = K_ssh with restrict + command="/opt/swarma/bin/swarma-rb-exec",\nsshd Match: no forwarding, no PTY, no user rc/env; egress by UID
+note right of T: see remote-worker-turn for the connection
 @enduml
