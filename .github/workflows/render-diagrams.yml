@@ -1,0 +1,32 @@
+name: render diagrams
+on:
+  workflow_dispatch:
+  pull_request:
+    paths: ['diagrams/**']
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq graphviz default-jre-headless wget
+          wget -q -O /tmp/plantuml.jar https://github.com/plantuml/plantuml/releases/download/v1.2025.4/plantuml-1.2025.4.jar
+      - name: C4 export (Structurizr CLI)
+        run: |
+          docker run --rm -v "$PWD:/w" -w /w structurizr/cli validate -workspace diagrams/c4/workspace.dsl
+          docker run --rm -v "$PWD:/w" -w /w structurizr/cli export -workspace diagrams/c4/workspace.dsl -format plantuml -output diagrams/artefacts/c4
+          rm -f diagrams/artefacts/c4/*-key.puml
+      - name: Render PNG and SVG
+        run: |
+          mkdir -p diagrams/artefacts/plantuml
+          java -jar /tmp/plantuml.jar -tpng diagrams/artefacts/c4/*.puml
+          java -jar /tmp/plantuml.jar -tsvg diagrams/artefacts/c4/*.puml
+          java -jar /tmp/plantuml.jar -tpng -o "$PWD/diagrams/artefacts/plantuml" diagrams/plantuml/sequence/*.puml
+          java -jar /tmp/plantuml.jar -tsvg -o "$PWD/diagrams/artefacts/plantuml" diagrams/plantuml/sequence/*.puml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: diagram-artefacts
+          path: diagrams/artefacts
+          if-no-files-found: error

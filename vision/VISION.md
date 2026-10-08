@@ -26,7 +26,7 @@ New sequences: `keeper-team-start`, `spawn-with-user`, `external-agent-onboardin
 
 ## 0. v1.2 changes (review round 2026-10-05)
 
-Contract text lives in `vision/contracts/`: `admission-and-delivery.md` (ADM), `restart-and-takeover.md` (RST), `handoff-package.md` (HOP), `kernel-guards.md` (KG), `goals.md` (GOL), `launch.md` (LCH), `plugins-and-interactions.md` (PLG).
+Contract text lives in `vision/contracts/`: `trust-and-isolation.md` (TRU, v1.3: identities, keeper, grants, action vocabulary and handlers, workplaces, entry channels, remote workplaces, credentials), `admission-and-delivery.md` (ADM), `restart-and-takeover.md` (RST), `handoff-package.md` (HOP), `kernel-guards.md` (KG), `goals.md` (GOL), `launch.md` (LCH), `plugins-and-interactions.md` (PLG).
 
 | Finding | Fix in v1.2 (or deferral with reason) |
 |---|---|
@@ -159,6 +159,7 @@ Project attachment of remotes is the versioned project binding in S4 (LCH §3). 
 GOL. Board goal revisions live in B1 (CAS, slots); board-free goals live in the host goal ledger; the goal provider only schedules nudges through `enqueue`. A board `clear --done` is an outcome proposal; `--blocked` and detector results are notices, never transitions. The no-progress detector runs in shadow mode during the D4 trial and has an activation gate. Goals never enter argv, the system prompt or managed surfaces (env §5.6). This answers 0021 open question 5 and is filed there.
 
 ### 4.7 Trust (M5)
+- v1.3: the full trust and isolation model — identities and the key keeper, grants with attenuation-only delegation, the registered action vocabulary and handlers, one OS user per agent, the three entry channels, remote workplaces and provider credentials — is in **TRU** (`contracts/trust-and-isolation.md`).
 - `verify(envelope) -> verdict`, `granted(actor, action, target)`, `mandate consume <id>` for privileged steps: identity ensure, remote attach, binding revisions, plugin install, weak data mode, tracked `yolo` (once the capability exists).
 - Grants used in v1.2: `session.input`, `session.approve`, `session.bind`, `session.control`, `terminal.raw`, `transcript`, binding grants for `post`/`inbox`.
 - **Assurance modes** (from B): T = same-UID guardrails; S = separated boundary, not claimed by any v1.2 path. Every plan and receipt states its mode. Flow-version confirmation stays the playbook's own trust interface (PB §2.4) and cannot waive a kernel predicate.
