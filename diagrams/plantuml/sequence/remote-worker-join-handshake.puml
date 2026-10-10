@@ -23,15 +23,13 @@ JP -> JP: invitation known, unexpired, not consumed? attempt counter
 JP --> C: server_challenge (5 min)
 C -> R: TXT _swarma, SSHFP, TXT _swarma-ssh-ca, TLSA (+ RRSIG chain)
 R --> C: records and signatures
-C -> C: validate DNSSEC locally from the embedded trust anchor;
-secure: must equal the invitation's pins; bogus or indeterminate: refuse
+C -> C: validate DNSSEC locally from the embedded trust anchor;\nsecure: must equal the invitation's pins; bogus or indeterminate: refuse
 C -> C: transcript = canonical CBOR, domain-separated:\n{version, invitation_id, project, role, K_sig, K_enc, K_ssh, server_challenge, client_nonce, expires_at, algorithms}
 C -> JP: HTTPS validated by the Web PKI, pinned by the DNSSEC-validated TLSA (and the invitation's certificate fingerprint when present)
 C -> JP: POST /join/cert {transcript, sig_K_sig(transcript), code}
 JP -> JP: code equal (constant time)? signature valid? challenge bound and fresh?\nconsume the invitation atomically -> tombstone(invitation_id, K_sig)\n(same K_sig retry -> same pending enrolment; other key -> refuse); rate limit
 JP -> OP: show {invitation_id, fingerprint, name, role}
-OP -> OP: check the enrolment against the signed marketplace card when there is one,
-otherwise the invitation the code binds; no voice comparison
+OP -> OP: check the enrolment against the signed marketplace card when there is one,\notherwise the invitation the code binds; no voice comparison
 OP -> T: pin K_sig, K_enc, K_ssh; root-signed admission; grants (scope, expiry)
 OP -> OP: package: AEAD to K_enc with AAD = H(transcript); signed by the operator certificate (root-signed, scope onboard)
 OP -> JP: release package for <invitation_id>
