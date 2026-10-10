@@ -14,7 +14,7 @@ actor "Operator (our side)\nor orchestrator with onboard grant" as OP
 participant "Trust registry + key keeper\n(our host)" as T
 
 == 1. invitation ==
-OP -> ADM: swarma-invitation/1 {invitation_id, join point, root fingerprint,\nSSH host key fingerprint, project, role, expires, one-use random code}\nover a second channel (the code is a short-lived bootstrap secret)
+OP -> ADM: swarma-invitation/1 {invitation_id, join point, root fingerprint,\nSSH host key fingerprint, project, role, expires, one-use random code}\nthrough whatever channel the donor found us by (the code is a short-lived bootstrap secret)
 
 == 2. local provisioning (transactional) ==
 ADM -> C: curator remote-worker init <invitation>
@@ -28,18 +28,18 @@ C --> ADM: show fingerprint F
 == 3. join (see join-handshake for the transcript) ==
 C -> JP: POST /join/challenge {invitation_id}
 JP --> C: server challenge (bound to the invitation, 5 min, attempt counter)
-C -> DNS: TXT _swarma, SSHFP, TLSA (only through a trusted validator)
+C -> DNS: TXT _swarma, SSHFP, TXT _swarma-ssh-ca, TLSA; DNSSEC validated inside the client (DoH fallback)
 alt secure and equal to the invitation
   C -> C: record "dns: secure, matches"
 else bogus
   C --> ADM: refused{dns_bogus}
-else indeterminate (no trusted validator)
-  C -> C: record "dns: indeterminate; pin bootstrap only"
+else indeterminate
+  C --> ADM: refused{dns_indeterminate} (no downgrade; decided 2026-10-10)
 end
-C -> JP: POST /join/cert {swarma-join/1 transcript, sig_K_sig, code} (TLS pinned)
+C -> JP: POST /join/cert {swarma-join/1 transcript, sig_K_sig, code} (HTTPS: Web PKI + DNSSEC-validated TLSA)
 JP -> JP: code (constant time), signature, challenge, expiry;\nconsume invitation atomically (tombstone); rate limit
 JP -> OP: pending enrolment: fingerprint F, name, role
-OP -> ADM: read back F over the second channel
+OP -> OP: check the enrolment against the marketplace card or the invitation; no voice comparison (decided 2026-10-10)
 alt F differs
   OP -> JP: reject
   JP --> C: refused

@@ -25,9 +25,9 @@ diagrams/
 │   ├── flow-config-load.puml        # narrow check, confirmation, atomic activation, generation fence
 │   ├── keeper-team-start.puml       # v1.3: keeper and its standing team brought up idempotently as OS users
 │   ├── spawn-with-user.puml         # v1.3: spawn through the dispatcher: grant, capacity, OS user, key, launch, retire
-│   ├── external-agent-onboarding.puml # v1.3 after CIP-0009 rev2: donor first deployment, two OS identities, three keys, locked posture
+│   ├── external-agent-onboarding.puml # v1.3 after CIP-0009 rev 2–3: donor first deployment (variants A/B/C), three keys, locked posture, no human second channel
 │   ├── remote-workplace-attach.puml # v1.3 after CIP-0009 rev2: a remote worker turn over swarma-rb/1, donor-side signing
-│   ├── remote-worker-join-handshake.puml # CIP-0009 rev2: server challenge, signed transcript, atomic invitation consumption
+│   ├── remote-worker-join-handshake.puml # CIP-0009 rev 2–3: server challenge, signed transcript, atomic invitation consumption; Web PKI + in-client DNSSEC + invitation pins
 │   ├── remote-worker-retire.puml # CIP-0009 rev2: stop/leave/purge (donor), suspend/retire/revoke (project)
 │   ├── mailbox-delivery.puml        # v1.3: broker verification, decision guard, doorbell, mailbox read, outbound signing
 │   ├── grant-issue-and-check.puml   # v1.3: issuing, delegating (attenuation only), checking and revoking grants
