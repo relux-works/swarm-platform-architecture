@@ -55,7 +55,7 @@ Status: VISION v1.3 contract draft (2026-10-08). Collects the owners' call of 20
 |---|---|---|
 | keeper | root (LaunchDaemon / service) | hardware-backed secret; peer-UID signing |
 | user/firewall helper | root for one command (sudoers) | users, ACL, pf/nftables rules |
-| session host | own unprivileged user | starts holders as agents through the helper; egress (v1): deny all |
+| session host | own unprivileged user | keeps the sessions; asks the dispatcher to start and stop runners under agent accounts (`host_start`, `host_stop`; review F-4, F-20), never calls the helper or the launcher; egress (v1): deny all |
 | bridge and broker | own unprivileged user | holds carrier credentials; peer-UID sockets; egress (v1): the broker only through its own proxy profile, the bridge later to its carrier |
 | egress proxy | own unprivileged user | the only network sink for agents and the broker; egress proxy-enforced by its allowlists |
 | dispatcher | own unprivileged user | accounting; calls the helper; egress (v1): deny all |
