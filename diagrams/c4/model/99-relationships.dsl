@@ -86,7 +86,7 @@ platform.board.kernelGuards -> git "Integrates accepted revisions (signed exact-
 platform.board.spawn -> platform.dispatcher "spawn = dispatch(LaunchRequest); RUN-* attached by reconciliation" "dispatch()"
 platform.dispatcher -> platform.trust "Checks the spawn grant and attenuation-only delegation" "granted()"
 platform.dispatcher -> platform.providerLimits "Local capacity: slots, disk, CPU" "admit_host()"
-platform.dispatcher -> platform.workplace "Creates and removes OS users, homes, ACLs and firewall rules through the privileged helper" "sudo helper"
+platform.dispatcher -> platform.workplace "Creates and removes OS users, homes and firewall rules through the privileged helper" "sudo helper"
 platform.dispatcher -> platform.keyKeeper "Registers the new UID to its identity path; requests revocation at retire" "register/revoke"
 platform.dispatcher -> platform.launcher "Launches as the new OS user" "curator run"
 platform.sessionHost.holder -> platform.workplace "Execs the harness as the agent's OS user" "setuid exec"

@@ -55,7 +55,7 @@ platform = softwareSystem "Swarm Platform" "Holds agent sessions, wraps their I/
 
   credentialBroker = container "Credential Broker" "Holds long-lived provider logins; hands each launch what its harness consumes (one-year token in env, API key through the helper command, shared file); tracks expiry; relays the vendor's own re-login flow to the operator's phone" "privileged daemon"
 
-  workplace = container "Agent Workplace" "One OS user per autonomous agent: home, ACL for the parent, kernel firewall admitting only the message broker and the egress proxy; created and removed by the dispatcher's helper; the unit of mode S" "OS user + kernel firewall"
+  workplace = container "Agent Workplace" "One OS user per autonomous agent: private home (0700, no parent ACL), kernel firewall admitting only the message broker and the egress proxy; created and removed by the dispatcher's helper; the unit of mode S" "OS user + kernel firewall"
 
   modelRouter = container "Model Router" "Model and effort per task class" "curator-model-router"
 

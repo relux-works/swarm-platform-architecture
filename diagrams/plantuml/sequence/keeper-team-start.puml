@@ -5,7 +5,7 @@ title Keeper start with its standing team (v1.3): every autonomous agent is an O
 actor "Owner" as OW
 participant "Registry / keeper\n(S4: binding, team[], up)" as Reg
 participant "Launch dispatcher" as D
-participant "Privileged helper\n(sudo: users, ACL, firewall)" as PH
+participant "Privileged helper\n(sudo: users, homes, firewall)" as PH
 participant "Key keeper\n(master secret, derivation)" as KK
 participant "Launcher\n(curator run)" as L
 participant "Session host" as SH
@@ -16,7 +16,7 @@ participant "Keeper session\n(OS user keeper_x)" as K
 Reg -> Reg: boot_id changed; read team[] of product X:\n{role, identity, standing|ephemeral, max}
 Reg -> D: bring up standing members (idempotent)
 loop for each standing member (keeper first, then orchestrators)
-  D -> PH: ensure user <identity>: home, mode 0700,\nparent ACL (read), group, firewall rules for the UID
+  D -> PH: ensure user <identity>: private home, mode 0700,\nno parent ACL, group, firewall rules for the UID
   PH --> D: uid, home (no change if it already exists)
   D -> KK: register(uid, identity path product/project/agent')
   KK -> KK: derive public key for the path;\nroot signature "descendant N" published once
