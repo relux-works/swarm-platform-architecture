@@ -1,6 +1,6 @@
 @startuml remote-workplace-attach
 !theme plain
-' Source: relux-works/curator-spec PR #134 (CIP-0009 revision 2, commit 5100b46), cips/diagrams; adapted. Updated 2026-10-12 for the accepted review findings F-7 (durable effect claims) and F-19 (service principal, stub as login shell, executions).
+' Source: relux-works/curator-spec PR #134 (CIP-0009 revision 2, commit 5100b46), cips/diagrams; adapted. Updated 2026-10-12 for the accepted review findings F-7 (durable effect claims) and F-19 (service principal, stub as login shell, executions). Updated 2026-10-13 for the owner's decision on internet access: the workplace has zero egress.
 title Remote workplace (v1.3, after Curator CIP-0009 and review findings F-7, F-19): a remote worker turn: the harness has no local tools; the relay (harness identity) forwards to the bridge service (bridge identity), which carries every tool call and the mailbox over ONE SSH connection from the donor to our host; our host never connects back
 
 box "Donor machine: harness identity (sandboxed, egress = proxy only)" #WhiteSmoke
@@ -14,7 +14,7 @@ end box
 box "Our host" #WhiteSmoke
   participant "sshd + root-owned stub\n(login shell of the workplace user;\nrelays the channel only)" as STUB
   participant "Workplace service\n(service principal: policy, caps,\neffect claims, audit, cert renewal)" as RB
-  participant "Workplace\n(OS-user account class, swarma-workplace-exec/1;\negress always enforced)" as WP
+  participant "Workplace\n(OS-user account class, swarma-workplace-exec/1;\nzero egress, loopback included)" as WP
   participant "Bridge\n(broker, mailbox, M3)" as BR
 end box
 participant "Orchestrator" as O
