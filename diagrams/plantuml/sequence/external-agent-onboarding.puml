@@ -56,6 +56,6 @@ else F matches
 end
 
 == 4. workplace on our host ==
-OP -> T: provision workplace for K (dispatcher, grant user.create): OS user,\nroot-owned AuthorizedKeysFile entry = K_ssh with restrict + command="/opt/swarma/bin/swarma-rb-exec",\nsshd Match: no forwarding, no PTY, no user rc/env; egress by UID
+OP -> T: provision workplace for K (dispatcher, grant user.create): workplace account class,\nlogin shell = the root-owned stub, root-owned AuthorizedKeysFile entry = K_ssh with restrict + forced command,\nsshd Match: no forwarding, no PTY, no user rc/env; egress ALWAYS enforced:\nrefused on a host without the v1 per-UID firewall (F-19)
 note right of T: see remote-worker-turn for the connection
 @enduml

@@ -32,7 +32,7 @@ C --> ADM: left; "init --rejoin" with a new invitation returns this identity to 
 OP -> T: suspend: grants paused
 OP -> D: retire workplace
 D -> BR: revoke channel authorization; close open sessions
-D -> D: kill every job and its descendants (process group / cgroup); verify no process of the workplace UID remains;\nremove the authorized key; archive permitted noncredential artifacts only; release account and egress rules
+D -> D: journaled stop of the workplace executions; confirm no process of the generation remains (F-19);\nremove the authorized key; delete the home, keep only the service-generated metadata export (F-1);\nrelease account and egress rules
 BR -> BR: next frame or envelope from this worker refused (retired); mailbox kept durable
 note right of BR: the donor's connection drops; its bridge reports "retired by project" and pauses
 OP -> T: revoke (only on compromise or departure): root-signed revocation of K_sig, K_enc, K_ssh

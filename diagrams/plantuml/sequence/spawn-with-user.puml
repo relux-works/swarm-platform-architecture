@@ -27,7 +27,7 @@ else granted
     Cap --> D: queued{handle} | refused{gate}
     D --> O: queued | refused
   else lease
-    D -> PH: create user w_17: home 0750 under the agents tree,\nACL orch_a read (inherit), firewall: only broker + egress proxy
+    D -> PH: create user w_17: private home 0700 under the agents tree, no parent ACL,\nfirewall: only broker + the egress proxy of its bound network profile (F-27)
     PH --> D: uid
     D -> KK: register(uid, path product/P/w_17')
     KK --> D: public key + root signature (registry record)
@@ -52,7 +52,7 @@ B -> B: accept or refuse; review by the playbook
 
 == retire ==
 D -> SH: stop; confirm absence
-D -> PH: archive home, delete user w_17, remove firewall rules
+D -> PH: delete home (only the service-generated metadata export is kept, F-1),\ndelete user w_17, remove firewall rules last
 D -> KK: revoke(identity w_17) → root-signed revocation record
 D -> T: revocation snapshot refreshed
 @enduml

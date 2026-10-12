@@ -1,7 +1,7 @@
 @startuml remote-workplace-attach
 !theme plain
-' Source: relux-works/curator-spec PR #134 (CIP-0009 revision 2, commit 5100b46), cips/diagrams; adapted name and title only.
-title Remote workplace (v1.3, after Curator CIP-0009 revision 2): a remote worker turn: the harness has no local tools; the relay (harness identity) forwards to the bridge service (bridge identity), which carries every tool call and the mailbox over ONE SSH connection from the donor to our host; our host never connects back
+' Source: relux-works/curator-spec PR #134 (CIP-0009 revision 2, commit 5100b46), cips/diagrams; adapted. Updated 2026-10-12 for the accepted review findings F-7 (durable effect claims) and F-19 (service principal, stub as login shell, executions).
+title Remote workplace (v1.3, after Curator CIP-0009 and review findings F-7, F-19): a remote worker turn: the harness has no local tools; the relay (harness identity) forwards to the bridge service (bridge identity), which carries every tool call and the mailbox over ONE SSH connection from the donor to our host; our host never connects back
 
 box "Donor machine: harness identity (sandboxed, egress = proxy only)" #WhiteSmoke
   participant "Harness\n(Claude / Codex / Muse, lockdown plan)" as H
@@ -12,18 +12,20 @@ box "Donor machine: bridge identity (keys, audit, cursors)" #WhiteSmoke
   participant "Bridge service\n(supervisor + SSH client + signer + admission)" as SUP
 end box
 box "Our host" #WhiteSmoke
-  participant "sshd + forced command\nswarma-rb-exec (workplace user)" as RB
-  participant "Workplace\n(OS-user backend, swarma-workplace-exec/1)" as WP
+  participant "sshd + root-owned stub\n(login shell of the workplace user;\nrelays the channel only)" as STUB
+  participant "Workplace service\n(service principal: policy, caps,\neffect claims, audit, cert renewal)" as RB
+  participant "Workplace\n(OS-user account class, swarma-workplace-exec/1;\negress always enforced)" as WP
   participant "Bridge\n(broker, mailbox, M3)" as BR
 end box
 participant "Orchestrator" as O
 
 == standing connection ==
-SUP -> RB: ssh workplace-user@host with K_ssh; host key checked against the pin on EVERY connection (no TOFU)
+SUP -> STUB: ssh workplace-user@host with K_ssh (short user-CA certificate); host key checked against the pin on EVERY connection (no TOFU)
+STUB -> RB: relay the channel to the service's Unix socket (peer UID + active generation checked)
 RB --> SUP: hello {versions:[1]} / swarma-rb/1 channel open (bounded CBOR frames, flow credits)
 SUP -> RB: policy.get
 RB --> SUP: workplace policy {tools, write scope, network, limits, env_allow} -> effective tool set
-note right of RB: Match block: root-owned AuthorizedKeysFile, restrict, no forwarding, no PTY,\nno user rc/env; forced command by absolute path; reconnect is the donor side's job
+note right of STUB: Match block: root-owned AuthorizedKeysFile, restrict, no forwarding, no PTY,\nno user rc/env; forced command by absolute path. The stub IS the login shell:\nsshd runs forced commands via the login shell, so no ~/.zshenv or ~/.bashrc is ever read.\nNothing that enforces policy runs as the workplace user. Reconnect is the donor side's job.
 
 == launch ==
 SUP -> SUP: obtain the composed plan from the construction site (agents-management);\ncheck expect_pin, tool_posture=lockdown, permissions=remote-auto, policy generation, qualified tuple;\nvalidate the expanded launch against the generated policy; resolve credential_binding/1
@@ -49,9 +51,10 @@ loop each tool call
   MCP -> SUP: forward over the relay socket (peer credentials checked)
   SUP -> SUP: audit line {tool, args_sha256, bytes, at}; budget counters (trusted side)
   SUP -> RB: frame exec {id, op_key, cmd, cwd, env (env_allow only), timeout_s <= policy, max_output_bytes <= policy, lease_s}
-  RB -> WP: run as the workplace user in its own process group with a lease; audit {who, what, when, policy id}
+  RB -> RB: durable effect claim {binding generation, op_key, canonical-args digest} BEFORE the effect;\nfreshness window checked; mismatching reuse refuses
+  RB -> WP: start as a launcher execution under the workplace user (start receipt, lease);\naudit {who, what, when, policy id} stays with the service
   WP --> RB: stdout/stderr frames (seq), exit
-  RB --> SUP: frames (result cached by op_key for 10 min)
+  RB --> SUP: frames (result cached 10 min; the claim outlives the cache)
   SUP --> MCP: result
   MCP --> H: tool result
 end
@@ -61,7 +64,7 @@ alt the model requests a built-in tool (Bash, Edit, WebFetch ...)
 end
 alt SSH channel drops mid-turn
   SUP -> SUP: pause the turn loop; running turn continues to its deadline;\ntool calls fail with channel_down (retryable); result post queued durably with its op_key
-  SUP -> RB: reconnect with backoff; host key rechecked; catch up from the durable cursor;\nreplay-safe: cached result or unknown_result, never a second effect
+  SUP -> RB: reconnect with backoff; host key rechecked; catch up from the durable cursor;\nreplay-safe: a known claim answers the cached result or unknown_result, never a second effect
 end
 
 == result ==
