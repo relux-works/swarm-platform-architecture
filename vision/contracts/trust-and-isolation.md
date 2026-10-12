@@ -48,8 +48,12 @@ Status: VISION v1.3 contract draft (2026-10-08). Collects the owners' call of 20
 - **Internet and builds (owner decision, 2026-10-13).** Inside our environment an agent's account has no internet beyond what its own agent loop needs.
   - **Trusted local agents** reach only the model-provider endpoints of their qualified tuple, through their own listener.
   - **A workplace** reaches nothing (§7.6).
-  - **Web access** is a tool of the agent loop:
-    - provider-side search;
+  - **Web access is off by default** (owner, later the same night). The design works without it:
+    - a task carries the resources it needs, such as fresh documentation, read-only and by digest, and the trusted side fetches more on request;
+    - the donor's loop reaches only its provider's endpoints and our host;
+    - our side has no internet.
+  - **Search is an opt-in** for trusted-circle identities only. The operator grants it per identity, and never to the untrusted class. Its forms are:
+    - provider-side search, which no network rule sees, so the launch plan keeps it off unless the identity holds the opt-in;
     - a donor-side MCP server holding the donor's own key (§7.2);
     - for local agents, a platform web-tool service whose key never sits in an agent account, reached over a Unix socket with a grant.
   - **Builds and tests.** Agents neither build nor test. A controlled verification phase runs builds and tests on ephemeral runners on another machine, without secrets, and dependencies are fetched only there.
@@ -73,7 +77,7 @@ Status: VISION v1.3 contract draft (2026-10-08). Collects the owners' call of 20
 | session host | own unprivileged user | keeps the sessions; asks the dispatcher to start and stop runners under agent accounts (`host_start`, `host_stop`; review F-4, F-20), never calls the helper or the launcher; egress (v1): deny all |
 | bridge and broker | own unprivileged user | holds carrier credentials; peer-UID sockets; egress (v1): the broker only through its own proxy profile, the bridge later to its carrier |
 | egress proxy | own unprivileged user | the only network sink for agents and the broker; one listener per bound account generation; egress proxy-enforced by its served policies, and its kernel row denies private, tailnet and metadata ranges as a backstop |
-| web-tool service (optional) | own unprivileged user | holds its search key; agents reach it over a Unix socket with a grant; egress: its own listener, ports 80 and 443 under the dial guard |
+| web-tool service (optional) | own unprivileged user | holds its search key; only opted-in trusted-circle agents reach it, over a Unix socket with a grant; egress: its own listener, ports 80 and 443 under the dial guard |
 | dispatcher | own unprivileged user | accounting; calls the helper; egress (v1): deny all |
 | agents | one user each | kernel boundary; egress: their own listener of the bound profile, model-provider endpoints only |
 | remote workplaces | one user each, a workplace account class | the worker's jobs; login shell is the root-owned stub; egress: none, loopback included (§7.6) |
@@ -110,7 +114,7 @@ A remote worker's harness runs on the **donor** machine and does all its work on
 - **A states its limit.** If a qualified harness build turned out to offer a local tool after all, the model would act as the donor's user. That is the accepted risk of the first milestone; exact builds checked before exec and the bridge's posture check (R9) are its guards.
 - **The lock without a system layer.** In A and C the locked configuration lives in the donor's own files: the harness cannot change it (A: no tools; C: outside its writable set); the donor can, and then the bridge stops the worker instead of running it open.
 - **Executables.** In A and C under the donor's state directory (`~/Library/Application Support/swarma/<release>/`, `~/.local/share/swarma/<release>/`), each digest verified before exec; in B under the root-owned `/opt/swarma/releases/<release>/`.
-- **Egress.** B: per-UID firewall rules; C: the sandbox's network rules; A: none of its own, the harness reaches its provider directly. Web access, where the donor offers it, is a donor-side MCP server holding the donor's own key. It runs under its own identity in B or under its own sandbox profile in C, never in the harness or the bridge identity (owner decision 2026-10-13; CIP-0009).
+- **Egress.** B: per-UID firewall rules; C: the sandbox's network rules; A: none of its own, the harness reaches its provider directly. By default the donor's loop has no web access and reaches only its provider's endpoints and our host. In A its locked configuration ensures this; in B and C these egress rules also enforce it. For a trusted-circle worker the operator may grant a donor-side MCP server holding the donor's own key. That server runs under its own identity in B or under its own sandbox profile in C, never in the harness or the bridge identity (owner decisions 2026-10-13; CIP-0009).
 - **Order (owner):** A on macOS and Linux first, then B on macOS, then C (Seatbelt under the donor's user, then Landlock or bubblewrap on Linux).
 
 **Variant B in detail (CIP-0009 D1, D2):**
