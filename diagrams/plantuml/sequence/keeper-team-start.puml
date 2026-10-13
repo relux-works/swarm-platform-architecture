@@ -1,5 +1,6 @@
 @startuml keeper-team-start
 !theme plain
+' Updated: accepted architecture-review findings (2026-10-13)
 title Keeper start with its standing team (v1.3): every autonomous agent is an OS user; identities come from the key keeper; bring-up is idempotent after a reboot
 
 actor "Owner" as OW
@@ -14,16 +15,16 @@ participant "Keeper session\n(OS user keeper_x)" as K
 
 == reboot or first start ==
 Reg -> Reg: boot_id changed; read team[] of product X:\n{role, identity, standing|ephemeral, max}
-Reg -> D: bring up standing members (idempotent)
+Reg -> D: illustrative historical bring-up request (idempotent);\nrequester open per RST §5, admitted lifecycle required
 loop for each standing member (keeper first, then orchestrators)
   D -> PH: ensure user <identity>: private home, mode 0700,\nno parent ACL, group, firewall rules for the UID
   PH --> D: uid, home (no change if it already exists)
-  D -> KK: register(uid, identity path product/project/agent')
+  D -> KK: register (uid, generation, identity path, owner, registration generation);\none-shot flag recorded (API unpublished; dispatcher §14 gate)
   KK -> KK: derive public key for the path;\nroot signature "descendant N" published once
   KK --> D: public key, registry record (unchanged if known)
   D -> L: launch as <identity> (profile, expect_pin, binding)
   L -> SH: intake (plan, pin, binding pin)
-  SH -> K: exec under a holder as the OS user; closed fence
+  SH -> D: host_start under admitted permit; dispatcher invokes the privileged launcher;\nagent-side runner starts under the agent UID (jointly gated); closed fence
   L -> BR: bind I/O (rooms of product X), mailbox for the identity
   SH -> SH: issue session token; readiness probe; fence open
   SH --> D: RUN record {identity, uid, execution}

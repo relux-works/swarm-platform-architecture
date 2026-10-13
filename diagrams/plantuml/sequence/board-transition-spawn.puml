@@ -1,5 +1,6 @@
 @startuml board-transition-spawn
 !theme plain
+' Updated: accepted architecture-review findings (2026-10-13)
 title Board transition -> proposal -> kernel guard -> intent -> role router -> spawn with an idempotent key -> goal revision published
 
 actor "Orchestrator or person" as Act
@@ -8,6 +9,7 @@ database "B1 Task store\n(+ kguard)" as TS
 participant "B3 Role router" as RR
 participant "Product registry\n(S4)" as Reg
 participant "B4 Spawn" as SP
+participant "Dispatcher" as D
 participant "Launcher\n(thin client)" as L
 participant "Session host\n(M1 + M2, ledger)" as SH
 participant "Bridge\n(M3)" as BR
@@ -40,7 +42,8 @@ else guards pass
       Same request_id = same result.
     end note
     L -> SH: intake, start, initialize
-    SH -> W: exec under holder
+    SH -> D: host_start under admitted permit; dispatcher invokes privileged launcher
+    D -> W: agent-side executor/holder starts after UID drop
     L -> BR: bind(worker, matrix thread), bind(worker, board)
     SH --> L: ready
     L --> SP: LaunchResult{logical_session_id, plan_digest, profile_pin, effective}
@@ -54,7 +57,7 @@ end
 
 == Completion ==
 W -> W: works; writes outcome via task-board
-W -> BR: swarm-tail goal clear ~--done (board slot)
+W -> BR: swarm-tail goal clear ~--done (board slot; SH1 outcome proposal only, D-GOALS)
 BR -> SH: delivery record: pending_acceptance (nudges paused)
 BR -> BP: goal.outcome proposal{G42, rev 1, done, evidence}
 BP -> FE: transition(TASK-42, to=testing, actor=run RUN-981, own_element)
@@ -70,7 +73,7 @@ else kguard and guards pass
   note right of RR: next owner spawns the same way
 end
 note over W, BP
-  goal clear ~--blocked, or a no-progress result, becomes
+  SH1 board goal clear ~--blocked, or a no-progress result, becomes
   a notice to the orchestrator or a person, never a transition.
 end note
 @enduml

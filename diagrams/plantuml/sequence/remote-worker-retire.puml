@@ -1,5 +1,6 @@
 @startuml remote-worker-retire
 !theme plain
+' Updated: accepted architecture-review findings (2026-10-13)
 ' Source: relux-works/curator-spec PR #134 (CIP-0009 revision 2, commit 5100b46), cips/diagrams; adapted name and title only.
 title Remote worker lifecycle (v1.3, after Curator CIP-0009 revision 2): stop, leave and purge on the donor; suspend, retire and revoke on our side; the identity stays pinned unless revoked
 
@@ -9,7 +10,7 @@ participant "Dispatcher + helper\n(our host)" as D
 participant "Bridge (M3) + sshd" as BR
 actor "Donor (the machine's owner)" as ADM
 participant "curator remote-worker\n(donor; bridge identity)" as C
-participant "Privileged helper (donor)" as PH
+participant "Separate donor provisioner\n(pending; name, schema and privileges unpublished;\nvariant B disabled until specified)" as PH
 
 note over OP, PH
   States: enrolled -> active <-> stopped (donor) | suspended (project) -> retired -> revoked -> purged.
@@ -47,7 +48,7 @@ else channel unreachable
   C -> C: record "channel unreachable; the project side must revoke separately"
 end
 C -> C: delete keys, locked config, managed home; audit kept for the donor
-C -> PH: remove-worker <label>: both accounts, egress anchor, sandbox profile, daemon unit (journal, rollback)
-PH --> C: done
+C -> PH: remove donor accounts, homes, egress and sandbox\n(operations unpublished; journal/rollback intent only)
+PH --> C: intended removal result; pending contract
 C --> ADM: removed; nothing of the project remains on this machine; revocation outcome printed
 @enduml

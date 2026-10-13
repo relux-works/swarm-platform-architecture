@@ -3,7 +3,7 @@
 Status: PROPOSAL **v1.3** (draft on top of v1.2; owners' call of 2026-10-07 folded in as §0). v1.2 by the solution architect, 2026-10-05. Not canon; the reviewed revision was v1.1 (fa4fbc68). Sources: `00-owner-concept.md` (intent), `research/INVENTORY-OURS.md` (OURS), `research/INVENTORY-IVANS.md` (IVANS), `research/herdr-study.md` (HERDR), `research/tb-keeper-answer-2026-10-05.md` (TBK), `research/curator-advice-2026-10-05.md` (CUR), the curator-playbook spec v4.8 (PB; external, curator repo, `research/playbook/` is **not** in this snapshot). Review round: `research/joint-review-sol-2026-10-05.md` (JR; B = the R191 package, cited H/C/F as there) and `research/pr1-reviews-2026-10-05.md` (tb-keeper = TBK-R, ivan-curator = CUR-R). Detailed contracts: `vision/contracts/*.md`. Owner decisions: `vision/DECISIONS-FOR-OWNERS.md`. Diagrams: `diagrams/`. Flow example (illustrative, non-activatable): `vision/flows/swarm-project.Playbook.json`.
 This design and Ivan's R191 package cover the same layer and go to ONE architecture review (TBK). v1.2 converges on B's supervisor/holder split, host-enforced admission, delivery evidence and restart fences (JR §5).
 
-Updated 2026-10-13: accepted architecture-review findings (2026-10-13), aligned to the canonical module contracts; no implementation or activation is claimed.
+Updated 2026-10-13: accepted architecture-review findings (2026-10-13), aligned to the canonical module contracts; no implementation or activation is claimed. This revision aligns signed-intent replay and storage ownership, registers pending contract requirements and removes superseded summaries.
 
 ## 0. v1.3 changes (owners' call 2026-10-07, Ivan and Alexis)
 
@@ -19,7 +19,7 @@ Decisions of both owners, recorded in the wiki ledger (`decisions.md`, "2026-10-
 | Spawns leave the board for the runtime; the board keeps its spawn interface and calls the runtime | New optional container **Launch Dispatcher**: run accounting, local capacity, OS-user lifecycle through one privileged helper; B4 becomes a client of it; without it the orchestrator calls `curator run` directly |
 | Remote workplace = an OS user on our host: SSH by the pinned key, tools inside the user boundary, Mailbox for tasks, connection towards the host only; the previous component name is retired | the old container is renamed **Remote Workplace** (final name pending the owner's decision); LCH §8 wording updated accordingly |
 | Provider credentials: no interception of provider traffic in the first implementation; shared material where the harness tolerates it, the one-year token where it does not | New container **Credential Broker**; LCH §7 keeps `source_ref`; the proxy-injection path is research only |
-| Stable project team with idempotent bring-up; a system-administrator capability under a trust | Project binding gains `team[]` (role, identity, standing or ephemeral, max); S4 `up` brings standing members back; the privileged helper (not an agent) creates and removes users on requests carrying `user.create` |
+| Stable project team with idempotent bring-up; a system-administrator capability under a trust | Project binding gains `team[]` (role, identity, standing or ephemeral, max); standing bring-up is idempotent (requester open per RST §5; S4 `up` is the historical proposal); the privileged helper (not an agent) creates and removes users on requests carrying `user.create` |
 | The board becomes remote; session logs leave git | Priority change in §8; K7 unchanged |
 | Harness security prompts may be answered by the wrapper under policy | PLG §2: an allowlist of prompt kinds answered automatically under the parent's `session.approve`; everything else parks |
 | Plan: spec without the board → C4 and sequences → joint review → MVP without the board (two harnesses, one subscription, one machine, the user chain, the certificate handshake, a Matrix space) → the board | §8 gains the MVP milestone before Phase 2 |
@@ -87,10 +87,10 @@ Non-goals: our own runtime/harness (curator-agent-runtime, Apiary: deferred); a 
 
 | # | Module | Responsibility (one line) | Shape |
 |---|---|---|---|
-| M1 | Session host: supervisor | Plan intake (the `ax start --launch-plan` contract), session/execution registry, admission fences, host-enforced `admit()`, scheduling, restart and reconciliation, exec machinery (process groups, abort fences, exit classification, retries) | `agent-session-host` daemon, one per OS security domain |
+| M1 | Session host: supervisor | Plan intake (the `ax start --launch-plan` contract), session/execution registry, admission fences, host-enforced `admit()`, scheduling, restart and reconciliation, runner lifecycle requests through the dispatcher, abort fences and exit classification | `agent-session-host` daemon, one per OS security domain |
 | — | Execution holder | Owns one native process (PTY or framed pipes); controller epoch, execution generation, exclusive input lease. No goals, board, carrier or journal semantics | Minimal process per execution |
 | M2 | Context Engine | Harness adapters, event normalizer, journal (host-owned store), dispatcher (the only stdin writer), snapshot/export/seed, interactions | **Internal package of the session host** (not a daemon) |
-| — | Goal ledger | Board-free goal authority and delivery records for board goal revisions (GOL) | Internal package of the session host |
+| — | Goal ledger | Caller-authored initial board-free goals and delivery records for board revisions; no agent goal-authoring capability (GOL, D-GOALS) | Internal package of the session host |
 | M3 | Bridge | Hosts carrier/goal/board provider processes; trust gate; durable bridge-local admission; host enqueue; audience-checked outbox; tails | `agent-session-bridge`, separate daemon per user |
 | M3.x | Providers | Matrix/a2a, goal provider (scheduler), terminal watch, board provider (B5 client), later XMPP/Telegram | Child processes, `swarm-plugin/1` JSONL (PLG) |
 | M4 | Launcher | Thin client over the launch transaction (LCH): validate, capacity, compose via curator-run, compare `expect_pin`, hand to M1 or M6, drive initialize. Never reads a fragment or store content, never spells a flag, never execs or holds | `curator run` canonical entry; `swarm launch` optional wrapper (D-R3) |
@@ -107,7 +107,7 @@ Real dependency list (A-M5): the board calls M4 (spawn), M3 (B5 speaks the provi
 
 | Layout role (owner) | Session kind | Launch | I/O bindings | Supervision | Board use (§5.6) |
 |---|---|---|---|---|---|
-| Meta-keeper | Interactive, long-lived, local | `curator run --profile meta-keeper` (mode interactive) | Matrix `#lobby`, `#broadcast`, `#system`; goal; terminal | M1 `always-restart`; S4 `up` | Reads product boards (query only) |
+| Meta-keeper | Interactive, long-lived, local | `curator run --profile meta-keeper` (mode interactive) | Matrix `#lobby`, `#broadcast`, `#system`; goal; terminal | M1 admitted lifecycle; reboot requester open per RST §5 | Reads product boards (query only) |
 | Product keeper `X_keeper` (Space X, not a repo) | Interactive, long-lived, local | `--profile product-keeper`, binding X (cwd = product dir) | Matrix `#X-lobby`, `#X-broadcast`, `#X-system`; goal | Same; in S4 under X | Root of the product board; standing owner of the `product` role (slots, GOL §3) |
 | Project orchestrator (one repo) | Interactive, local or remote | `--profile orchestrator`, binding X/<repo> [target remote] | Matrix `#X-<project>`; goal; board | Restart with takeover | Root role of the project board; goal = current story |
 | Worker | Headless, bounded | Spawned by B4 or an orchestrator: LaunchRequest JSON, `parent`, `continuity seeded:<pkg>` | Thread or new room in `#X-<project>`, or none | Exits with a result | Owner of one (element, state) |
@@ -137,7 +137,7 @@ Project attachment of remotes is the versioned project binding in S4 (LCH §3). 
 | rwh `bundle.json` | produced by Curator from the pin if still needed, never by M4 (LCH §8) |
 
 ### 4.2 Session host (M1)
-- Intake: the `ax start <name> --provider <id> --launch-plan - --workspace <cwd>` contract (0013 §3, 0021 §2), always in strict mode. The host stores the immutable plan, `profile_pin`, fragment digest, binding pin and the effective posture. The plan carries no secret values; M1 does protected credential lookup at exec (LCH §7).
+- Intake: the `ax start <name> --provider <id> --launch-plan - --workspace <cwd>` contract (0013 §3, 0021 §2), always in strict mode. The host stores the immutable plan, `profile_pin`, fragment digest, binding pin and the effective posture. The plan carries only an opaque `source_ref`; the admitted agent-side executor re-resolves the protected binding after the UID drop (D-EXECUTOR; LCH §7).
 - `stop`, `status`, `list`, `attach/detach` (humans, exclusive input lease, PLG §3), `park(reason) -> handoff_ref`, `resume`, `restart(controlled)`, `takeover(logical_session_id, new_request)`. All are typed mutations behind `admit()` (ADM §4).
 - **Fence and restart:** RST. Resume compares the pin and posture first, then replays the stored plan; drift refuses (strict mode); a new plan is composed only for a rebuild.
 - Events: `session.started|exited|crashed|parked|resumed|restored|refused` (with step and reason).
@@ -155,6 +155,7 @@ Project attachment of remotes is the versioned project binding in S4 (LCH §3). 
 - Plugins: `swarm-plugin/1` (PLG §1). Host → plugin: `bind{binding_handle, config}`, `unbind`, `output{binding_handle, projected event}`, `receipt`, `shutdown`. Plugin → host: `manifest`, `envelope`, `cursor`, `health`, `secret.resolve`.
 - Envelope `swarm-envelope/2` and verdicts `authoritative | host_authored | agent_authored | data | quarantine | reject` (ADM §2–§3). Unsigned bodies become doorbells (D-R2). Framing is supplementary.
 - Trust gate checks in order: signature over exact bytes → enrolled identity → grant scope for `action` and `target` → freshness, replay, id claim → binding revision. The host re-checks at enqueue and at dispatch.
+- Registered delegated effects remain the open requirement in TRU §4: first consumer Trust/bridge/host, first registered delegated effect. The full fix lands with that consumer's contract package; ADM §§2–4 stay unchanged and the route stays closed without peer-data elevation.
 - **Tails**: passive `swarm-tail park` (no mandate; no goal mutation), `post`, `inbox read` (binding grant; `post` rate-limited and audited), authenticated by `SWARM_SESSION_TOKEN`, a same-UID guardrail scoped to the session's own bindings (ADM §6).
 
 ### 4.6 Goals (smart Ralph loop and board goals)
@@ -163,6 +164,7 @@ GOL, D-GOALS (session host §3.8). Board goal revisions live in B1 (CAS, slots);
 ### 4.7 Trust (M5)
 - v1.3: the full trust and isolation model — identities and the key keeper, grants with attenuation-only delegation, the registered action vocabulary and handlers, one OS user per agent, the three entry channels, remote workplaces and provider credentials — is in **TRU** (`contracts/trust-and-isolation.md`).
 - `verify(envelope) -> verdict`, `granted(actor, action, target)`, `mandate consume <id>` for privileged steps: identity ensure, remote attach, binding revisions, plugin install, weak data mode, tracked `yolo` (once the capability exists).
+- Registered-action handler admission is pending under TRU §4 and the §4.5 cross-reference, not an extension of the closed session envelope.
 - Grants used in v1.2: `session.input`, `session.approve`, `session.bind`, `session.control`, `terminal.raw`, `transcript`, binding grants for `post`/`inbox`.
 - **Assurance modes** (from B): T = same-UID guardrails; S = separated boundary, not claimed by any v1.2 path. Every plan and receipt states its mode. Flow-version confirmation stays the playbook's own trust interface (PB §2.4) and cannot waive a kernel predicate.
 
@@ -236,7 +238,7 @@ The board is task management plus externally configured flows, under kernel guar
 - `human`: a notice through out providers; the move waits for their act. `tool`/`process`: the board's tool executor or a hand-off (PB §6.5, §6.11), not the platform.
 
 ### 5.4 B4 Spawn
-- `spawn` = `M4.launch` + a `RUN-*` record attached by reconciliation (KG §5). B4 never execs: curator-run composes, the session host (or M6) execs and holds, the Context Engine opens the adapter, M3 binds I/O, the host seeds the optional slice.
+- `spawn` = `M4.launch` + a `RUN-*` record attached by reconciliation (KG §5). B4 never execs: curator-run composes; for hosted execution the session host asks the dispatcher to start the agent-side executor/holder under the agent UID (session host §§3.2–3.5; dispatcher §12); the target executor handles M6, the Context Engine opens the adapter, M3 binds I/O, the host seeds the optional slice.
 - Model choice: role `needs` + the operator's `models.toml` + project `policy.data.models` → S1. Slots and per-host gates come from S3. The board records the `LaunchResult.effective` values.
 
 ### 5.5 B5 Board goal binding
@@ -258,7 +260,7 @@ The board is task management plus externally configured flows, under kernel guar
 
 | Module | Verdict | Component(s) | Reference |
 |---|---|---|---|
-| M1 + holder | ADAPT (target) / REUSE (Phase-0 baseline) | Baseline: tb-sessiond. Target: agent-session-host with intake, fences, admission and task-board's exec machinery | TBK (2); IVANS §3, §8; H:628–656 |
+| M1 + holder | ADAPT (target) / REUSE (Phase-0 baseline) | Baseline: tb-sessiond. Target: agent-session-host with intake, fences, admission and dispatcher-mediated runner lifecycle | TBK (2); IVANS §3, §8; H:628–656 |
 | M2 | BUILD | Context Engine package: adapters (from tb-sessiond and rwh), journal, dispatcher, export/seed; hosted-stream mode in agents-management | IVANS §8; HERDR §4; CUR §3 |
 | M3 + providers | BUILD | agent-session-bridge, durable admission, plugin ABI; Matrix doorbell over a2a; goal provider | IVANS §4; OURS §2.1, §5.3; C:618–663 |
 | M4 | REUSE + BUILD | curator-run (add compose-only: needs the 0019/0021 amendment), agents-management plan, Curator profiles; launch transaction; agents-infra launchers via Gate A | IVANS §2; CUR §2, §5 |
@@ -277,7 +279,7 @@ Conflicts with the R191 package, D-R1 to D-R8: **`vision/DECISIONS-FOR-OWNERS.md
 | # | Topic | State / recommendation |
 |---|---|---|
 | D1 | HOME vs tool-home | **Closed: tool-home only.** Empty HOME is for M6 remote-workplace turns only. |
-| D2 | Headless ownership | Compose-only amendment of 0019 §2–3 and 0021 §6/§8 proposed (LCH §9); exec stays with the session host. Part of D-R3. |
+| D2 | Headless ownership | Compose-only amendment of 0019 §2–3 and 0021 §6/§8 proposed (LCH §9); hosted start/stop stay with the dispatcher at the host's request (session host §§3.2–3.5; dispatcher §12). Part of D-R3. |
 | D3 | Matrix vs carrier-neutral | Carrier-neutral; Matrix doorbell baseline first; XMPP if E2E is promised (D-R6). |
 | D4 | Native vs stdin goals | Goal truth per GOL; delivery by stdin nudge; `native_goal` boolean; two-week trial, which also measures the no-progress detector in shadow mode. |
 | D5 | Which session holder | agent-session-host with minimal holders and the Context Engine as a package (D-R7). |
@@ -292,7 +294,7 @@ Conflicts with the R191 package, D-R1 to D-R8: **`vision/DECISIONS-FOR-OWNERS.md
 | Q3 | M1 intake via `ax start --launch-plan`? | Yes, as a contract the host implements; no `ax` implementation dependency. |
 | Q4 | Remote resolution | Launch intent with `profile_pin`; the target composes and refuses on mismatch; no M4 bundle (LCH §8). |
 | Q5 | Unattended Claude credentials | **Settled boundary (D-EXECUTOR):** `curator-run` under the agent account, later `swarma-session-runner` sharing the launch library, re-resolves the protected binding and leases after the UID drop; M1 and the board runner have no broker client. Decision 0021's adopted amendment and remaining executor publication/qualification gates are described in LCH §7; no automatic per-home fallback. |
-| **O1** | **Shared-main landing coordination** (TBK-R 6) | **Open, outside the platform.** Landing windows and rulings are arbitration protocol (S5 or the protocol repo). Neither B2 nor B6 provides them; K3 only guarantees each landing's own transaction. Owner: the arbitration side (tb-keeper), to be named in the joint review. |
+| **O1** | **Shared-main landing coordination** (TBK-R 6) | **Open, outside the platform.** Landing windows and rulings are arbitration protocol (S5 or the protocol repo). Neither B2 nor B6 provides them; K3 only guarantees each landing's own transaction. Owner: the arbitration side (tb-keeper), to be named in the joint review. Coordination does not include transport: the non-agent repository/artifact effect performer remains the open requirement in TRU §6, first consumed by Board/infrastructure stage T and fixed with that stage's contract package; no topology is chosen here. |
 | O2 | `pi` runtime adapter | Deferred: no M2 adapter; `tty` interactive only. |
 | O3 | Mode S | Deferred: no path claims it until a broker/OS boundary is evidenced. |
 
@@ -306,7 +308,7 @@ Alignment with the curator roadmap (CUR §5): "fold in the agents-infra launcher
 |---|---|---|
 | 1 One launch path | compose-only + hosted-stream in curator-run/agents-management; host intake; fragment v4; S3 with per-host gates; S4 bindings; remote intent with pin | 0019/0021 amendment adopted; `hosted-stream/1` refusal tests; pin-mismatch and binding-drift negative fixtures |
 | 2 Context Engine + bridge | one board-free structured vertical: one harness, mode T, Matrix doorbell or a test producer; durable admission; interactions; `swarm-tail` | ADM negative fixtures (changed bytes under a reused id, wrong target, forged plugin author, stale approval, disk full); unknown-outcome reconciliation test |
-| 3 Portability | HandoffPackage export/seed, controlled restart, takeover, reboot restore via S4 `up` | RST fence tests (crash mid-restart, refused drift ends the path, stop unconfirmed); HOP audience/secret fixtures |
+| 3 Portability | HandoffPackage export/seed, controlled restart, takeover, reboot restore (requester open per RST §5; S4 `up` historical) | RST fence tests (crash mid-restart, refused drift ends the path, stop unconfirmed); HOP audience/secret fixtures |
 | 4 Board | PC1 seam with `kguard`; B4 over M4; B3; B5; then dev + design flows | KG conformance suite + PC1 behaviour-equivalence gate; operator go |
 
 **Cutover** of any production consumer (tb-sessiond, task-board spawn) is operator-run: private fork, gated merge-back, R55 binary swap in the maintenance slot, sticky legacy routes, rollback-reader compatibility, and observation of unknown deliveries, stalled approvals and lease leaks afterwards. A calendar window (for example October 19) is the earliest date, not an authorization (D-R8).

@@ -2,7 +2,7 @@
 
 Status: VISION v1.2 contract draft (2026-10-05). Fixes A-B1 and A-B3 of `research/joint-review-sol-2026-10-05.md` (JR) and tb-keeper condition 4 (`research/pr1-reviews-2026-10-05.md`, TBK-R). It is a draft for the joint review, not a delivered schema. Where the R191 package (B) already has the rule, this contract adopts it: H:659–701 and C:643,669–684,698–708,734–773,823–834,900.
 
-Updated 2026-10-13: accepted architecture-review findings (2026-10-13), aligned to the canonical module contracts; no implementation or activation is claimed.
+Updated 2026-10-13: accepted architecture-review findings (2026-10-13), aligned to the canonical module contracts; no implementation or activation is claimed. This revision binds replay to complete signed intent, references host storage ownership and marks the registered-action route pending.
 
 ## 1. Principles
 
@@ -32,7 +32,11 @@ Signed part (canonical JSON; every field except `sig`):
 
 `sig`: `{alg: ed25519, key_id, value}` over the canonical bytes. Required for every action except `data`, `notice` and host-generated `nudge`.
 
+**Canonical intent digest.** `envelope_digest` is SHA-256 of the RFC 8785 JCS bytes of the complete signed part above: every envelope field except `sig`. The signature value and bridge-authored wrapper are excluded. The same immutable digest binds bridge admission, host enqueue, deduplication and receipt lookup (§5); it is compared under the existing `(principal, id)` claim, never added to that claim key.
+
 The bridge wraps an arrival in an **AdmissionRecord**, which is bridge-authored and never part of the signed bytes: `{envelope_digest, principal (derived), verdict, assurance_mode, binding_id, binding_rev, admitted_at, bridge_seq, bridge_sig}`.
+
+**Open registered-action route:** TRU §4 owns the pending requirement for delegated registered effects. The session-only target/action grammar here and the verdict/admission rules in §§3–4 are not extended by that example; the unused route stays closed until its contract package publishes a constructible typed path.
 
 ## 3. Verdicts and what they allow
 
@@ -72,13 +76,15 @@ There is no untyped path to stdin. The only stdin writer is the context engine's
 No distributed transaction (adopting C:676,698–708): two local atomic steps and an idempotent hand-over.
 
 1. **Carrier → provider mailbox.** The provider persists the raw event (fsync) and only then advances its carrier cursor.
-2. **Bridge admission (atomic, bridge-local store).** In one transaction: claim `(principal, id) → body_sha256`; compute the verdict; write the AdmissionRecord; state `accepted`.
-   - Same `(principal, id)` and same hash: a duplicate; return the existing receipt.
-   - Same `(principal, id)`, different hash: `reject: id_conflict`, audit, no delivery.
+2. **Bridge admission (atomic, bridge-local store).** In one transaction: claim `(principal, id) → envelope_digest`; compute the verdict; write the AdmissionRecord; state `accepted`.
+   - Same `(principal, id)` and same `envelope_digest`: an exact canonical-byte retry; return the original receipt bound to that intent.
+   - Same `(principal, id)`, different `envelope_digest`: `reject: id_conflict`, audit, no delivery, even if the body hash is unchanged. Any renewed or changed signed content requires a new ID.
    - `origin_id` equal to an item this session posted through its outbox: `reject: reflection`.
-3. **Durable host enqueue.** The bridge calls `host.enqueue(record, idem_key)`, where `idem_key = sha256(principal | id | body_sha256 | target.logical_session_id)`. The host writes the item to the session's durable inbox (fsync) and returns `ack{host_seq}`. The bridge marks `queued` only after the ack and retries until ack or `expires_at`. The host dedupes by `idem_key` for at least the retention floor.
+3. **Durable host enqueue.** The bridge calls `host.enqueue(record, idem_key)`. `idem_key` identifies the existing `(principal, id)` claim, not a new claim per digest or target; its encoding remains unpublished. Before enqueue or receipt lookup, the host compares the immutable `envelope_digest` with the stored claim: an exact retry returns the original receipt, while changed signed content produces `id_conflict` with no enqueue. The host writes a new admitted item and its intent binding to the session's durable inbox (fsync) and returns `ack{host_seq}`. The bridge marks `queued` only after the ack and retries until ack or `expires_at`. The host retains the claim and its digest/receipt binding for at least the retention floor.
 4. **Dispatch.** At a turn boundary (or as a native steer, if the adapter supports it) the dispatcher re-runs `admit` (revocation, expiry, fence, readiness), writes the item to the adapter, and records `dispatched{host_seq, execution_id, input_marker}`.
 5. **Application evidence.** The adapter confirms that the harness accepted the input (stream-json echo of the user message with the marker, the codex app-server item id, the muse serve ack). Then the state is `applied`. A pipe write alone is never `applied`.
+
+**Replay checks and qualification.** Authenticate the caller and verify the original signed bytes before comparing a claim or returning its receipt. Digest equality supplies no authority and bypasses none of the current grant, revocation, binding, expiry, reflection, dispatch, reconciliation or retention checks. Before the first signed receiver consumes this contract (Trust/mailbox/host, S0b or earlier), publish and qualify an exact canonical-byte retry plus same-body conflicts with changed action, logical session, execution, media type, validity window, grant references and binding revision. These are contract vectors, not a claim of implementation or qualification.
 
 Receipt states, sent back to the provider in order: `accepted → queued → dispatched → applied`, or `refused{reason}`, `expired`, `unknown`. The word "delivered" is no longer used.
 
@@ -92,7 +98,9 @@ Receipt states, sent back to the provider in order: `accepted → queued → dis
 
 **Retention and anti-replay floors.** Id claims and tombstones are kept for `max(expires_at) + 7 d`, at least 30 days. Arrivals with `issued_at` more than 2 min in the future or older than their TTL are rejected. The host keeps a monotonic high-watermark clock per store. A store restored from backup (a store epoch older than the recorded one) keeps the session's admission fence closed until an operator reconciles.
 
-**Storage failure.** Disk full, fsync error or a corrupt store means `refused: storage` at whichever step failed. Nothing is acknowledged without being persisted.
+**Retained storage ownership.** The session host owns the service-side accounting/retention contract (session host §§3.1–3.4, 3.7 and publication/qualification register; dispatcher §§6, 9, 12–13 log-storage handoff). Before the first durable consumer, possibly S0b and necessarily H, its contract package must carry the dispatcher's bounded-output invariant through that handoff: producer-attributed retained-byte/count debt for output, queued input and required evidence, plus an aggregate budget, charged/reserved before durable acceptance and retained across replacement/retirement until safe disposition. It must bound transport buffers, backpressure/refusal and non-cooperative stop/park behavior, and protect a hard control/journal/evidence reserve for affected and unrelated sessions; admission refuses if that reserve cannot be maintained. Retention/compaction separates disposable diagnostics from required replay evidence, preserves the floors above and keeps incomplete evidence closed/unknown, never intact or proof of absence. Host-owned qualification covers sustained output, closed-fence queues, replacement/retirement debt and aggregate exhaustion with bounded refusal logs. Budgets, formats, ordering and retention policy remain unpublished; no standing-session lifetime or arbitrary storage-loss survival is introduced here.
+
+**Storage failure.** Disk full, fsync error or a corrupt store means `refused: storage` at whichever step failed. Nothing is acknowledged without being persisted. The host-owned reserve protects against producer exhaustion; corruption or a dead filesystem remains a storage failure.
 
 ## 6. Tails and `SWARM_SESSION_TOKEN` (tb-keeper condition 4)
 

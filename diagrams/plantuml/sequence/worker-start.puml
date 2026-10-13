@@ -1,6 +1,6 @@
 @startuml worker-start
 !theme plain
-' Updated: accepted architecture-review findings (2026-10-13)
+' Updated: accepted architecture-review findings (2026-10-13); normal exit reconciles dispatcher/user-manager absence before capacity release
 title Worker start: launch transaction (prepare, capacity, compose, admit, start, initialize, ready); launcher composes only, the dispatcher starts the agent-side executor/holder
 
 participant "Project orchestrator\n(harness)" as O
@@ -116,7 +116,13 @@ SH -> BR: observe (projected)
 BR -> MP: output{binding_handle, event}
 MP -> MX: post to thread
 W -> SH: turn.completed + exit
-SH -> SH: classify exit; confirm absence
-SH -> Cap: release(lease)
+SH -> D: reconcile exit against latest execution/stop receipt;\naccount-wide absence comes from dispatcher/user manager
+alt confirmed account-wide absence
+  D --> SH: absence confirmed
+  SH -> Cap: release(lease)
+else pending or unknown
+  D --> SH: absence unconfirmed
+  SH -> SH: keep fence closed, claim and capacity retained
+end
 MP -> MX: post result summary
 @enduml

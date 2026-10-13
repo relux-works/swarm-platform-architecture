@@ -2,13 +2,13 @@
 
 Status: VISION v1.2 contract draft. Fixes A-M2 and A-M3 (JR), ivan-curator objections 1–4 and suggestions 6–7, and tb-keeper condition 3. Replaces the v1.1 LaunchRequest field list (VISION v1.1 §4.1). The canonical entrypoint and the headless compose-only amendment are owner decisions (D-R3; see §8).
 
-Updated 2026-10-13: accepted architecture-review findings (2026-10-13), aligned to the canonical module contracts; no implementation or activation is claimed.
+Updated 2026-10-13: accepted architecture-review findings (2026-10-13), aligned to the canonical module contracts; no implementation or activation is claimed. This revision aligns hosted lifecycle summaries with dispatcher authority.
 
 ## 1. Roles
 
 - **Launcher (M4)**: a thin client. It validates, checks capacity, asks the composer for one plan, compares the pin, hands the plan to the session host (local) or a launch intent to the remote executor, then drives initialization. It never reads a fragment or Curator store content, never spells a native flag, never execs or holds.
 - **Composer**: curator-run (the only composer and fragment reader) + agents-management (the only native-grammar construction site, Decision 0019).
-- **Session host (M1+M2)**: intake of the exact plan, exec, hold, admission. `ax` is an optional backend and protocol peer; the host implements the `ax start --launch-plan` intake contract (0013 §3, 0021 §2) without depending on an `ax` implementation.
+- **Session host (M1+M2)**: intake of the exact plan, admission and fences; asks the dispatcher to start/stop the agent-side executor/holder (session host §§3.2–3.5; dispatcher §12). `ax` is an optional backend and protocol peer; the host implements the `ax start --launch-plan` intake contract (0013 §3, 0021 §2) without depending on an `ax` implementation.
 
 ## 2. `LaunchRequest` `swarm-launch-request/2`
 
@@ -55,8 +55,8 @@ Updated 2026-10-13: accepted architecture-review findings (2026-10-13), aligned 
 | `capacity` | S3 slot + per-host gates (§5) | `queued{handle}` or `refused: capacity:<gate>`. **The path stops here**; a queued request resumes from `capacity` when the handle fires |
 | `compose` | curator-run compose-only → plan, `profile_pin`, fragment digest; compare `expect_pin` | `refused: pin_mismatch \| capability_unavailable` |
 | `admit` | host intake: plan stored, binding and gates rechecked, fence created **closed** | `refused{code}` |
-| `start` | exec through the holder; the capacity lease is **transferred to the host**, which releases it on exit, including failure cleanup | compensate: stop, confirm absence |
-| `initialize` | bind I/O, seed (`handoff-package.md` §5), goal publish, session token, readiness probe. No input reaches the harness before this stage ends | compensate: unbind, stop, confirm absence, release lease; `failed{stage}` |
+| `start` | host requests `host_start` under its admitted permit; the dispatcher invokes the privileged launcher and the agent-side executor/holder starts after the UID drop; capacity lease **transferred to the host** | compensate: `host_stop` through the dispatcher's journaled `exec.stop`; release only after confirmed account-wide absence; unknown retains fence, claim and capacity |
+| `initialize` | bind I/O, seed (`handoff-package.md` §5), goal publish, session token, readiness probe. No input reaches the harness before this stage ends | compensate: unbind, `host_stop` through dispatcher `exec.stop`, release lease only after confirmed account-wide absence; unknown retains fence, claim and capacity; `failed{stage}` |
 | `ready` | fence opens; queued input dispatches | n/a |
 
 `cancel(request_id)` before `ready` runs the same compensation. A bind failure can therefore not leave an orphan process.
@@ -73,7 +73,7 @@ S3 is more than a semaphore: `admit_host(host, job_class) → ok{lease} | refuse
 | `syspolicyd` | job classes that create fake executables (`job_class: fake_exec_suite`) are refused on hosts flagged with the syspolicyd bug | tb-R194 |
 | `slots` | provider slots and the validation FIFO | B6 |
 
-M4 consults `admit_host` at the `capacity` stage. The host re-checks the same gates immediately before exec (`start`), because time passes between them. For a remote target, the gates of the target host apply.
+M4 consults `admit_host` at the `capacity` stage. The host re-checks the same gates immediately before requesting dispatcher `host_start` (`start`), because time passes between them. For a remote target, the gates of the target host apply.
 
 ## 6. Hosted-stream mode and its permission wire (ivan-curator objection 2)
 
@@ -98,4 +98,4 @@ M4 consults `admit_host` at the `capacity` stage. The host re-checks the same ga
 
 ## 9. Decision amendment needed (ivan-curator suggestion 7)
 
-Headless compose-only contradicts 0019 §2–3 and 0021 §6/§8 ("no headless `curator run`"). v1.2 proposes one amendment to both: curator-run gains a compose-only output for headless and hosted-stream modes; exec stays with the session host. This is a launcher-owner decision (D-R3), not something this document adopts.
+Headless compose-only contradicts 0019 §2–3 and 0021 §6/§8 ("no headless `curator run`"). v1.2 proposes one amendment to both: curator-run gains a compose-only output for headless and hosted-stream modes; hosted start/stop go through the dispatcher at the session host's request (session host §§3.2–3.5; dispatcher §12). This is a launcher-owner decision (D-R3), not something this document adopts.

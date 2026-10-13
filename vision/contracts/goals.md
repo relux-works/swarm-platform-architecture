@@ -2,7 +2,7 @@
 
 Status: VISION v1.2 contract draft. Fixes A-M1 (JR) and tb-keeper condition 5. Recommends D-R4 (`vision/DECISIONS-FOR-OWNERS.md`).
 
-Updated 2026-10-13: accepted architecture-review findings (2026-10-13), aligned to the canonical module contracts; no implementation or activation is claimed.
+Updated 2026-10-13: accepted architecture-review findings (2026-10-13), aligned to the canonical module contracts; no implementation or activation is claimed. This revision removes superseded goal-status guidance.
 
 ## 1. Who owns what
 
@@ -40,4 +40,4 @@ Permission and question events (`interaction.pending`) are handled by `plugins-a
 - **Shadow mode first.** During the D4 two-week trial the detector only records `would_block{session, goal, signals}`. It changes no state and sends no notice.
 - Signals: N consecutive turns (default 3) with no tool call, an unchanged output digest and no change to the agent's plan or todo list. Turns of roles flagged `reasoning_turns_ok` (reviewers, architects) and every `blocked:permission` turn are excluded.
 - **Activation gate:** at least 100 recorded `would_block` events labelled by a person, with a false-positive rate the owners accept (proposal: at most 2 %). Until then the detector cannot mark anything blocked.
-- **After activation:** for a board-free goal it may set `blocked` and send a notice. For a board goal it only sends a `stalled` notice to the orchestrator or human owner. A detector result never triggers a board transition.
+- **After activation:** it may send a no-progress notice to the launching caller for a board-free goal, or a `stalled` notice to the orchestrator or human owner for a board goal. It authors no goal revision and sets no goal status (D-GOALS); a detector result never triggers a board transition.

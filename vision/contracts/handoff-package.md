@@ -2,6 +2,8 @@
 
 Status: VISION v1.2 contract draft. Fixes A-B4 (JR) and the remote half of ivan-curator objection 4. Replaces the v1 `swarm-handoff/1` (VISION v1.1 §4.4). Lifecycle per B (H:729–744, 768–788; C:779–784, 799); the schema below is A's proposal for the joint review.
 
+Updated 2026-10-13: accepted architecture-review findings (2026-10-13), aligned to the canonical module contracts; no implementation or activation is claimed.
+
 ## 1. Rules
 
 1. A package is a **projection** of the journal at a committed high-watermark H, made **for one recipient**. It is not a dump of session state.
@@ -25,7 +27,7 @@ Status: VISION v1.2 contract draft. Fixes A-B4 (JR) and the remote half of ivan-
   pins: { profile, profile_pin, fragment_digest?,            // fragment digest only for same-host restore
           plan_digest, project_binding: {id, rev, digest}, base_sha },
   harness: { env_id, adapter, version, native_session_ref? }, // ref only
-  goal_refs: [ { namespace: board | agent, goal_id, revision, digest } ],
+  goal_refs: [ { namespace: board | agent, goal_id, revision, digest } ], // agent namespace deferred (D-GOALS); not admitted
   items: [ { item_id, kind: summary | decision | open_item | event,
              text, sensitivity: internal | restricted,
              provenance: { author_principal, verdict, source_seq, source_digest, origin_sig? } } ],

@@ -1,11 +1,12 @@
 @startuml external-agent-onboarding
 !theme plain
+' Updated: accepted architecture-review findings (2026-10-13)
 ' Source: relux-works/curator-spec PR #134 (CIP-0009 revision 2, commit 5100b46), cips/diagrams; adapted name and title only.
 title External agent onboarding (v1.3, after Curator CIP-0009 revision 2): remote worker on a donor machine, first deployment: one invitation, one command; two OS identities; three role-separated keys owned by the bridge identity; the posture is locked by the donor (the machine's owner)
 
 actor "Donor (the machine's owner)" as ADM
 participant "curator remote-worker init\n(donor install)" as C
-participant "Privileged helper\n(sudoers: this absolute path only;\nclosed schema; journal + rollback)" as PH
+participant "Separate donor provisioner\n(pending; name, schema and privileges unpublished;\nvariant B disabled until specified)" as PH
 participant "Bridge identity\nswarma-rb-<project>\n(keys, config, audit)" as B
 participant "Harness identity\nswarma-rw-<project>\n(managed home, scratch)" as U
 database "DNS (DNSSEC)\nTXT _swarma, SSHFP, TLSA\n(cross-check)" as DNS
@@ -19,8 +20,8 @@ OP -> ADM: swarma-invitation/1 {invitation_id, join point, root fingerprint,\nSS
 == 2. local provisioning (transactional) ==
 ADM -> C: curator remote-worker init <invitation>
 C -> C: refuse unsupported host; verify the release manifest of /opt/swarma/<release>
-C -> PH: create-worker <label>: two accounts (allocated UIDs), homes,\negress anchor by UID, Seatbelt profile (read boundary), launchd daemon unit
-PH --> C: journal entry per step (rollback on failure)
+C -> PH: provision donor accounts, homes, egress and sandbox\n(operations unpublished; variant B remains disabled)
+PH --> C: intended journal/rollback behavior; pending contract
 C -> B: generate K_sig (Ed25519), K_enc (X25519), K_ssh (Ed25519); 0600, bridge-owned
 B -> B: enrolment certificate {K_sig, K_enc, K_ssh, name, role, invitation_id, expires}\nself-signed by K_sig; fingerprint = SHA-256(certificate)
 C --> ADM: show fingerprint F

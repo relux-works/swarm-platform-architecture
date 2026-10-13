@@ -1,13 +1,13 @@
 @startuml spawn-with-user
 !theme plain
-' Updated: accepted architecture-review findings (2026-10-13)
+' Updated: accepted architecture-review findings (2026-10-13); user-manager ownership of stop made explicit
 title Spawn through the dispatcher (v1.3): grant check without amplification, capacity, OS user, key, launch, result, retire
 
 participant "Orchestrator\n(OS user orch_a)" as O
 participant "Launch dispatcher" as D
 participant "Trust\n(grants, revocation)" as T
 participant "Capacity (S3)" as Cap
-participant "Privileged helper\n(sudo)" as PH
+participant "User manager / helper\n(sudo)" as PH
 participant "Key keeper" as KK
 participant "Launcher\n(curator run)" as L
 participant "Credential broker" as CB

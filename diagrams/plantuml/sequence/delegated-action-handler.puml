@@ -1,5 +1,6 @@
 @startuml delegated-action-handler
 !theme plain
+' Updated: accepted architecture-review findings (2026-10-13)
 title Delegated action (v1.3): an external orchestrator commands a registered action under a grant chain; the gate verifies the chain, the registry names the handler, which is a deterministic process (B) or an agent (A)
 
 participant "External orchestrator\n(other owner's user, key signed by G2)" as XO
@@ -11,6 +12,13 @@ participant "Trust registry\n(keys, grants, actions)" as T
 participant "Handler A: admin orchestrator\n(OS user admin_orch)" as HA
 participant "Handler B: runner helper\n(privileged process)" as HB
 participant "Our session host" as SH
+
+note over XO, SH
+  Illustrative route only; unused delegated effects stay closed (TRU §4).
+  Before the first consumer, its contract package must publish a
+  constructible typed action/target path preserving exact signed proof.
+  ADM session-envelope grammar is not extended here; peer data gains no authority.
+end note
 
 == issue (before) ==
 note over T

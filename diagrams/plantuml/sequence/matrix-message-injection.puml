@@ -1,5 +1,6 @@
 @startuml matrix-message-injection
 !theme plain
+' Updated: accepted architecture-review findings (2026-10-13)
 title Matrix message -> provider mailbox -> bridge admission -> durable host enqueue -> dispatch -> applied; output through an audience projection
 
 database "Matrix (a2a)" as MX
@@ -18,28 +19,30 @@ BR -> BR: principal from handle + verified carrier identity\n(claimed_sender is 
 BR -> T: exact-byte signature, enrolled key,\ngrant for action on target, revocation
 T --> BR: result
 
-BR -> BS: atomic: claim (principal, id) -> body_sha256,\nverdict, admission record
-alt same id, same hash
-  BR -> MP: existing receipt (duplicate)
-else same id, other hash / reflection / expired / wrong target
+BR -> BS: atomic: claim (principal, id) -> envelope_digest of complete canonical signed intent,\nverdict, admission record
+alt same principal/id, same canonical signed-intent digest
+  BR -> MP: original intent-bound receipt (exact retry; no new enqueue)
+else same principal/id, changed signed intent (even with same body) / reflection / expired / wrong target
   BR -> BS: audit
   BR -> MP: receipt refused{reason}
-else unsigned
-  BR -> BS: quarantine: body stays in the mailbox
-  BR -> SH: enqueue(doorbell: channel, claimed sender, ids)
-else signed peer
-  BR -> SH: enqueue(data, UNTRUSTED PEER EVENTS frame)
-else operator-signed user_turn
-  BR -> SH: enqueue(user_turn, authoritative)
-end
+else new admitted intent
+  alt unsigned
+    BR -> BS: quarantine: body stays in the mailbox
+    BR -> SH: enqueue(doorbell: channel, claimed sender, ids)
+  else signed peer
+    BR -> SH: enqueue(data, UNTRUSTED PEER EVENTS frame)
+  else operator-signed user_turn
+    BR -> SH: enqueue(user_turn, authoritative)
+  end
 
-SH -> SH: admit(): bridge identity, grant, expiry,\nbinding rev; idem_key dedupe
-alt storage failure or refused
-  SH --> BR: refused{storage or reason}
-  BR -> MP: receipt refused
-else persisted (fsync)
-  SH --> BR: ack{host_seq}
-  BR -> MP: receipt queued
+  SH -> SH: admit(): bridge identity, grant, expiry, binding rev;\nidem_key identifies principal/id; compare stored envelope_digest\nbefore enqueue or receipt lookup; changed intent = id_conflict
+  alt storage failure or refused
+    SH --> BR: refused{storage or reason}
+    BR -> MP: receipt refused
+  else persisted (fsync)
+    SH --> BR: ack{host_seq}
+    BR -> MP: receipt queued
+  end
 end
 
 == Dispatch (fence open, turn boundary) ==
@@ -62,7 +65,14 @@ MP -> MX: ack (mailbox receipt)
 
 == Output ==
 H -> CE: events (text, tool calls, turn.completed)
-CE -> CE: journal append (host store)
+CE -> CE: reserve/charge retained debt before journal append (host store)
+note right of CE
+  Before durable acceptance: charge producer and aggregate retained debt;
+  debt survives replacement/retirement; bound buffers and refusals.
+  Producer output cannot consume control/evidence reserve.
+  Host storage contract owns budgets/retention and qualification (ADM §5).
+  Storage failure never produces a durable ack.
+end note
 CE -> BR: observe(OutputEvent)
 BR -> BR: audience projection: final_text by default;\ntool calls only with a transcript grant
 BR -> BS: outbox item (origin id kept for reflection checks)

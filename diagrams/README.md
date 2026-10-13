@@ -1,5 +1,7 @@
 # Diagrams: swarm platform target architecture
 
+Updated 2026-10-13: accepted architecture-review findings (2026-10-13); source alignment only, no implementation or activation claimed. Changed renders are supplied by the pull-request workflow before landing.
+
 Diagrams as code for `vision/VISION.md`. Layout follows `ARCH-DIAGRAMS-SKILL.md`.
 
 ```
@@ -18,7 +20,7 @@ diagrams/
 │   ├── worker-start.puml            # launch stages with capacity gates and compensation
 │   ├── remote-worker-start.puml     # pin-carrying intent; target composes
 │   ├── matrix-message-injection.puml # admission, durable enqueue, delivery evidence, egress projection
-│   ├── goal-loop.puml               # board-free goal ledger; provider schedules only
+│   ├── goal-loop.puml               # caller/board-authored goals; agent self-goals deferred (D-GOALS); provider schedules only
 │   ├── context-takeover.puml        # fence, confirmed absence, seed or native resume
 │   ├── controlled-restart.puml      # fence, drain, park, absence, eligibility, reconcile, release
 │   ├── board-transition-spawn.puml  # proposal -> kguard -> intent -> role router -> spawn

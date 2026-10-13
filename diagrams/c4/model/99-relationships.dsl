@@ -1,4 +1,4 @@
-# Updated: accepted architecture-review findings (2026-10-13)
+# Updated: accepted architecture-review findings (2026-10-13); dispatcher-mediated start and absence-bound capacity
 # People
 owner -> matrix "Talks to keepers in product spaces"
 owner -> platform.trust "Signs mandates, grants and authoritative envelopes" "mandate CLI"
@@ -24,7 +24,7 @@ platform.sessionHost.supervisor -> platform.sessionHost.admission "Every typed m
 platform.sessionHost.supervisor -> platform.sessionHost.holder "Fences and controls the current registered runner; start/stop via dispatcher" "controller epoch"
 platform.sessionHost.supervisor -> platform.composer "Compare-only pin answer on resume; new plan only for rebuild" "compose-only"
 platform.sessionHost.supervisor -> platform.sessionHost.contextEngine "Export, seed, reconcile unknown deliveries (opaque refs only)" "Go API"
-platform.sessionHost.supervisor -> platform.providerLimits "Rechecks gates before exec; holds the transferred lease" "admit_host/release"
+platform.sessionHost.supervisor -> platform.providerLimits "Rechecks gates before requesting dispatcher start; holds lease until confirmed absence" "admit_host/release"
 platform.sessionHost.admission -> platform.trust "Re-verifies grants and revocation at enqueue and dispatch" "verify/granted"
 platform.sessionHost.admission -> platform.sessionHost.journal "Persists fences and the durable inbox" "fsync"
 platform.sessionHost.contextEngine -> platform.sessionHost.admission "Dispatches only admitted items while the fence is open" "admit()"
@@ -90,7 +90,7 @@ platform.dispatcher -> platform.providerLimits "Local capacity: slots, disk, CPU
 platform.dispatcher -> platform.workplace "Creates and removes OS users, homes and firewall rules through the privileged helper" "sudo helper"
 platform.dispatcher -> platform.keyKeeper "Generation-bound registration; detach before UID reuse; separately revoke only its recorded one-shot identity after retirement" "register/revoke"
 platform.dispatcher -> platform.launcher "Launches as the new OS user" "curator run"
-platform.sessionHost.holder -> platform.workplace "Execs the harness as the agent's OS user" "setuid exec"
+platform.sessionHost.holder -> platform.workplace "Runs under the agent's OS user; started by the privileged launcher via the dispatcher" "agent-side executor/holder"
 platform.harness -> platform.keyKeeper "Asks for signatures of its outbound messages; the key never leaves the keeper" "unix socket, peer UID"
 platform.bridge.trustGate -> platform.bridge.decisionGuard "Admitted message checked against the addressee's grants before the doorbell" "verdict + fingerprint"
 platform.bridge.decisionGuard -> platform.bridge.mailbox "Stores the body with its verification record" "append"
