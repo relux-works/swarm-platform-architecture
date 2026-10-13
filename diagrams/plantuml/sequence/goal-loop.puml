@@ -1,67 +1,61 @@
 @startuml goal-loop
 !theme plain
-title Goal loop (smart Ralph loop, board-free): the agent sets its own goal in the host ledger; the goal provider schedules nudges through the bridge
+title Goal loop: caller/board authorship (D-GOALS); agent self-goals deferred to SH2+ G2
+' Updated: accepted architecture-review findings (2026-10-13)
 
-participant "Harness\n(agent)" as H
-participant "swarm-tail\n(CLI)" as Tail
-participant "Bridge\n(M3)" as BR
-participant "Goal provider\n(scheduler)" as GP
+actor "Initiating caller" as Caller
+participant "Launcher" as L
+participant "Optional board/orchestrator" as B
 participant "Session host\n(goal ledger, admission)" as SH
-participant "Context Engine\n(M2)" as CE
-participant "Capacity\n(S3)" as Cap
-participant "Matrix provider" as MP
+participant "Goal provider\n(scheduler)" as GP
+participant "Current registered runner\n(agent account)" as R
+participant "Harness\n(agent)" as H
 
-H -> Tail: swarm-tail goal set "make tests green"\n~--until "go test ./... passes" ~--max-nudges 10
-Tail -> BR: tail{goal.set} + session token
-BR -> BR: token scope: this execution, own bindings;\ngoal and park need no mandate
-BR -> SH: goal.set (namespace agent)
-SH -> SH: admit(); author = this session's agent (caller-derived);\nCAS rev 0 -> 1
-SH --> BR: ok{goal_id, rev 1}
-BR --> Tail: ok
-note right of SH
-  Agent-set goal stays agent_authored,
-  never operator authority. Goals never
-  go into argv or the system prompt.
+note over Caller, H
+  Authority and ordering only: goal-client actions/capability shape,
+  runner proof and goal-free completion path remain unpublished.
+  Session host §3.8 owns the joint publication/qualification gates.
+  Goal absence never blocks launch, attach, delivery, wake, stop or recovery.
+  SH1 retains its existing optional board compatibility seam.
 end note
-
-loop while goal active
-  H -> CE: turn.completed
-  CE -> BR: observe(turn.completed, state=idle)
-  BR -> GP: output{binding_handle, event}
-  GP -> BR: goal.get(goal_id)
-  BR -> SH: goal.get
-  SH --> BR: active, rev 1, nudges 3
-  BR --> GP: goal state
-  GP -> GP: no-progress detector (shadow): record would_block only
-  alt max nudges reached
-    GP -> BR: goal.delivery_update(exhausted)
-    BR -> SH: ledger: state exhausted (CAS)
-    BR -> MP: notice (goal exhausted) to #X-system
-  else budget available
-    GP -> Cap: acquire(nudge budget)
-    Cap --> GP: lease
-    GP -> BR: nudge request (goal_id, rev)
-    BR -> SH: enqueue(nudge: host_authored frame,\ngoal text labelled agent_authored)
-    SH -> CE: dispatch at next turn boundary
-    CE -> H: stdin: "Your own goal: make tests green. Continue.\nDone: swarm-tail goal clear ~--done\nBlocked: swarm-tail goal clear ~--blocked <reason>"
-    H -> H: works a turn
-  end
+alt initial goal supplied by launching caller
+  Caller -> L: initial goal with admitted start
+  L -> SH: caller-authored initial goal; authenticated attribution
+else optional board goal revision
+  B -> SH: board-owned revision (CAS, slot)
 end
-note over CE, GP
-  Permission prompts are interaction.pending events,
-  handled outside this loop (plugins-and-interactions.md).
-  While one is pending the goal does not nudge or count turns.
+SH -> SH: host admission; caller authority, current revision, bounded budget;\nagent executor gains no goal-authoring capability
+SH -> SH: persist revision durably
+SH -> R: at turn boundary, deliver to current-epoch registered runner
+R -> H: admitted goal input
+H --> R: harness acknowledgement
+R --> SH: acknowledgement
+SH --> Caller: applied, deferred or rolled back with joined error
+
+loop while authorised goal active and budget available
+  H -> R: turn completed; idle
+  R -> SH: current execution state
+  GP -> SH: schedule nudge for committed revision
+  SH -> SH: revision, budget and interval checks; host admission
+  SH -> R: host-authored nudge frame; goal text keeps author's provenance
+  R -> H: continue toward caller/board goal
+end
+note over GP, H
+  Pending interactions suspend nudges and turn counting.
+  No-progress detector remains shadow-only until its activation gate.
+  CAS, budgets and outcome ownership are retained (GOL §§3–5).
 end note
-
-alt agent finished
-  H -> Tail: swarm-tail goal clear ~--done
-  Tail -> BR: tail{goal.clear done}
-  BR -> SH: goal.clear (CAS rev 1 -> 2, state done)
-  BR -> MP: notice (goal done) to thread
-else agent blocked
-  H -> Tail: swarm-tail goal clear ~--blocked "needs owner decision"
-  Tail -> BR: tail{goal.clear blocked}
-  BR -> SH: goal.clear (state blocked)
-  BR -> MP: ask to #X-system
+opt board bound, agent reports outcome
+  H -> B: outcome proposal or blocked notice through retained board seam
+  B -> B: board owner accepts/refuses; only it changes goal revision/state
 end
+opt passive park note
+  H -> SH: park note through existing tail/bridge path
+  SH -> SH: local agent-authored note; no goal revision
+end
+note over R, H
+  Session-token possession gives no goal capability.
+  Self-goal set/clear/status and board-free agent completion are not enabled.
+  G2 later chooses bounded self-goals or caller/board authorship only.
+end note
 @enduml

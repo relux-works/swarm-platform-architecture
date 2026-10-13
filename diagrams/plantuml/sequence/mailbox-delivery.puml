@@ -1,6 +1,7 @@
 @startuml mailbox-delivery
 !theme plain
-title Mailbox delivery (v1.3): the agent never reads the carrier; the broker verifies, the decision guard checks against grants, the doorbell rings, the agent fetches body + verification record; outbound is signed by the keeper
+title Mailbox delivery: key-class verdicts, narrowing guard, host admission and own-key outbound signing
+' Updated: accepted architecture-review findings (2026-10-13)
 
 database "Carrier\n(Matrix / XMPP)" as MX
 participant "Carrier provider\n(child process)" as MP
@@ -9,40 +10,52 @@ participant "Trust\n(keys, grants, revocation)" as T
 participant "Decision guard\n(small local model)" as DG
 database "Mailbox\n(bodies + verification records)" as MB
 participant "Session host\n(admission, dispatcher)" as SH
-participant "Agent\n(OS user a_7)" as A
+participant "Agent\n(own OS account)" as A
 participant "Key keeper" as KK
 
 == inbound ==
-MX -> MP: event addressed to agent a_7
+MX -> MP: event addressed to the session
 MP -> MP: persist (fsync); advance cursor
 MP -> BR: envelope bytes
-BR -> T: signature over exact bytes? key pinned? grant "write to a_7"?\nfresh, no replay, binding current?
-alt unsigned or unknown key
-  BR -> MB: quarantine body (no verification record)
-  BR -> SH: enqueue(doorbell: channel, claimed sender, id)
-else signed by a pinned key with the grant
-  BR -> DG: {body, sender grants, addressee grant spec}
-  DG -> DG: does the request fit the sender's grants towards a_7?\ninjection patterns? → verdict go | no-go, reasons
-  DG -> MB: record {body_sha256, sender, grants used, model version, verdict, fingerprint}
-  alt no-go
-    BR -> SH: enqueue(notice: refused by guard, fingerprint) (host_authored)
-  else go
-    BR -> SH: enqueue(doorbell + verification record ref, authoritative if the grant allows user_turn)
+BR -> T: exact-byte signature; admitted key class; action/target grant;\nfreshness, replay and current binding (ADM §3; TRU §6)
+alt unsigned
+  T --> BR: quarantine
+  BR -> MB: persist held body
+  BR -> SH: enqueue metadata-only doorbell
+  SH -> SH: admit(); durable inbox; dispatch only with open fence
+  SH -> A: doorbell only; body fetched as tool output
+else invalid signature, unknown key or other gate failure
+  T --> BR: reject
+  BR -> MB: refusal receipt and audit; no delivery
+else enrolled operator key or admitted peer key
+  T --> BR: operator key enrolled for binding: authoritative for granted typed action;\npeer key: data, no effect authority
+  BR -> DG: admitted body + verification record + grant specification
+  DG -> MB: record narrowing decision and fingerprint
+  alt guard unavailable or no-go
+    BR -> MB: refuse delivery; guard cannot elevate a verdict
+  else guard go
+    alt enrolled operator key and granted typed action
+      BR -> SH: enqueue authoritative typed action
+      SH -> SH: admit() again at every mutation;\nre-admit at dispatch (ADM §4)
+      SH -> A: user turn only if session.input admission passes
+    else peer key
+      BR -> SH: enqueue data + verification record
+      SH -> SH: admit() again; no approval or control authority
+      SH -> A: UNTRUSTED PEER EVENTS frame
+    end
   end
 end
-SH -> SH: admit() again; durable inbox; dispatch at a turn boundary
-SH -> A: stdin: "validated message <id> from <sender>: fetch from mailbox"\n(or the user turn itself when the grant allows it)
 
-== fetch and re-verify ==
-A -> MB: inbox read <id> (tool; binding grant; session token)
-MB --> A: body + verification record (who, which grant, what was checked, fingerprint)
-A -> A: optional second verification with the same library\n("security is never too much")
+== fetch held body ==
+A -> MB: inbox read (tool; binding grant; session token)
+MB --> A: body + verification record as tool output
 
 == outbound ==
-A -> BR: post <binding> <text> (tool; rate-limited; audited)
-BR -> BR: audience projection for the room
-BR -> KK: sign(bytes) on behalf of a_7 (peer UID = bridge; identity a_7 bound)
-KK --> BR: signature
-BR -> MP: output{signed metadata, text}
-MP -> MX: post; people see ordinary text, the signature rides in metadata
+A -> KK: sign exact outbound bytes under own UID (TRU §2)
+KK -> KK: active generation-bound registration; own key only
+KK --> A: signature
+A -> BR: post signed item (binding grant; rate-limited; audited)
+BR -> BR: verify exact signed bytes and audience projection;\nno rewriting of signed content
+BR -> MP: admitted signed output
+MP -> MX: post; ordinary text with signature metadata
 @enduml

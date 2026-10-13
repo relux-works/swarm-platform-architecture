@@ -2,6 +2,8 @@
 
 Status: VISION v1.2 contract draft. Fixes A-M2 and A-M3 (JR), ivan-curator objections 1–4 and suggestions 6–7, and tb-keeper condition 3. Replaces the v1.1 LaunchRequest field list (VISION v1.1 §4.1). The canonical entrypoint and the headless compose-only amendment are owner decisions (D-R3; see §8).
 
+Updated 2026-10-13: accepted architecture-review findings (2026-10-13), aligned to the canonical module contracts; no implementation or activation is claimed.
+
 ## 1. Roles
 
 - **Launcher (M4)**: a thin client. It validates, checks capacity, asks the composer for one plan, compares the pin, hands the plan to the session host (local) or a launch intent to the remote executor, then drives initialization. It never reads a fragment or Curator store content, never spells a native flag, never execs or holds.
@@ -82,8 +84,8 @@ M4 consults `admit_host` at the `capacity` stage. The host re-checks the same ga
 
 ## 7. Credentials (ivan-curator objection 3)
 
-- Every M1 intake is tracked. CIP-0003 item 5 refuses `token`/`helper` for tracked runs until the final executor does protected lookup itself. So: **M1 is that final executor.** It does the protected lookup at exec. The plan carries only an opaque `source_ref`; the board records `credential_mode`, never `source_ref`. This needs a CIP-0003 amendment naming M1 as a qualified executor; until it is adopted, M1 sessions use per-home login.
-- **Re-estimate of logins:** CIP-0002 homes are checkout × profile × env, so per-home logins grow with checkouts. Example: 2 products × 4 repos × 4 role profiles × 1 env = 32 homes per host, each needing one Claude `/login`, and again on each new checkout. That is the reason to amend CIP-0003 rather than wait.
+- **D-EXECUTOR.** The admitted agent-side executor/holder is the broker consumer: first `curator-run` under the agent account, later `swarma-session-runner` for SH2+ sessions, sharing one launch library. After the UID transition it verifies the caller-composed immutable plan, re-resolves the destination-local protected binding, opens a fresh broker connection and obtains its lease. It does not compose or resolve profiles under the agent account. The plan carries only an opaque `source_ref`; the board records `credential_mode`, never credential material or `source_ref`. The board runner and session-host service embed no broker clients; they ask the dispatcher for execution. The host retains metadata, admission and fences.
+- CIP-0003 item 5 follows the adopted narrow Decision 0021 amendment; the versioned one-shot intake and per-executor credential-injection qualification remain publication/activation gates, not a reason for automatic per-home fallback. Authority: credential broker §3.1 and session host §3.2; the exact intake grammar remains unpublished.
 
 ## 8. Remote path (ivan-curator objection 4)
 

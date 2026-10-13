@@ -1,40 +1,47 @@
 @startuml keeper-sign
 !theme plain
-title Key keeper (v1.3): a process asks for a signature over a local socket; the keeper identifies the caller by peer UID and signs with that identity's key; the private key never leaves the keeper
+title Key keeper: generation-bound own-key signing; retirement and identity revocation are separate
+' Updated: accepted architecture-review findings (2026-10-13)
 
-participant "Agent process\n(OS user a_7)" as A
-participant "Unix socket\n/var/run/swarma/keeper.sock\n(mode 0666)" as S
+participant "Agent process\n(own OS account)" as A
+participant "Unix socket\n(kernel peer credentials)" as S
 participant "Key keeper\n(privileged daemon)" as KK
 database "Master secret\n(Secure Enclave / TPM / DPAPI)" as HS
-database "Registry\n(identity → public key, UID map)" as R
+database "Registry\n(generation-bound registrations)" as R
 
-A -> S: connect; request sign{bytes_sha256, purpose}
-S -> KK: connection + peer credentials (uid 5017, pid)
-KK -> KK: uid 5017 → identity path product/P/a_7'\n(map written by the dispatcher at register)
-alt uid unknown or identity revoked
-  KK --> A: refused{unknown_uid | revoked}
-else known
-  KK -> HS: derive(path) inside the secure boundary (hardened child)
+note over KK, R
+  Integration stays disabled until registration/revocation API and
+  broker migration procedure are published and qualified.
+  Dispatcher §14, user manager §4.4, broker §4.3 (D-IDENTITY).
+end note
+A -> S: sign(bytes) with own identity
+S -> KK: connection + kernel peer credentials
+KK -> R: validate active ledger and registration tuple:\n(uid, generation, identity path, owner, registration generation)
+R --> KK: active registration or refusal
+alt unknown/stale registration or revoked identity
+  KK --> A: refuse; no signature
+else active registration
+  KK -> HS: derive registered identity path inside the secure boundary
   HS --> KK: signing capability for this operation
-  KK -> KK: sign canonical bytes; audit line {uid, identity, purpose, digest, at}
-  KK --> A: signature {alg ed25519, key_id, value}
+  KK -> KK: sign canonical bytes with caller's own key; audit
+  KK --> A: signature
 end
 
-== other callers ==
-note over KK
-  register(uid, path): dispatcher only (its own UID, grant user.create)
-  revoke(identity): owner's signed act or the dispatcher at retire
-  pubkey(identity): anyone
-  decrypt(blob): the identity's own UID only
-  The bridge signs on behalf of a posting agent only with that
-  agent's bound identity; the keeper checks the binding record.
+== registration and lifecycle ==
+note over KK, R
+  Registration records the one-shot flag; detach before UID reuse.
+  Account retirement does not itself revoke an identity.
+  Only the registering dispatcher may revoke its recorded one-shot
+  identity, after confirmed retirement, as a separate journaled effect.
+  Unknown/refused revocation retains the cleanup obligation.
+  Standing identity revocation requires an operator-signed record.
+  pubkey(identity) remains a public read; no private key is returned.
+  Exact registration/revocation grammar remains unpublished.
 end note
-
-== what cannot happen ==
-note over A, HS
-  No API returns a private key. A prompt-injected agent can ask for
-  signatures of what it is allowed to send, and nothing else: the
-  signature request is audited, rate-limited and tied to the identity
-  the kernel reports, not to anything the agent claims.
+note over A, KK
+  Signing and decryption are audited and rate-limited.
+  Decryption uses the caller's own identity.
+  The agent-side caller signs its outbound exact bytes under its own UID.
+  No bridge on-behalf signing operation is adopted.
 end note
 @enduml

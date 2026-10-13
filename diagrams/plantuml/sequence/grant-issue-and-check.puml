@@ -1,5 +1,6 @@
 @startuml grant-issue-and-check
 !theme plain
+' Updated: accepted architecture-review findings (2026-10-13)
 title Grants (v1.3): issuing by the owner, delegating with attenuation only, checking at every point of action, revoking
 
 actor "Owner\n(client app, root key)" as OW
@@ -13,7 +14,12 @@ participant "Bridge\n(broker)" as BR
 participant "Task core\n(board, kguard)" as B
 
 == issue ==
-OW -> OW: grant {issuer: owner, subject: key of Alexis (external, pinned),\naction: operator-of (input, approve, control, transcript),\ntarget: orchestrator X, expiry, delegable: no}
+OW -> OW: separate grants, actions[] entries from the register:\nsession.input for session X; session.approve bound to target.execution_id;\nsession.control for the concrete control target; expires_at, delegable: no
+note over OW, SH
+  The subject uses an operator key enrolled for the binding (ADM §§3–4).
+  transcript is the binding audience projection (ADM §7),
+  separate from session action authority; no generic operator action.
+end note
 OW -> TG: signed grant record
 TG -> T: verify owner signature; append; new revocation snapshot id
 T --> BR: snapshot refresh (broker, host, dispatcher, core subscribe)

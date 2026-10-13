@@ -1,5 +1,6 @@
 @startuml controlled-restart
 !theme plain
+' Updated: accepted architecture-review findings (2026-10-13)
 title Controlled restart: persisted fence -> drain -> park -> confirmed absence -> eligibility -> start -> reconcile -> release (contracts/restart-and-takeover.md)
 
 actor "Operator" as Op
@@ -10,7 +11,9 @@ participant "Holder +\nold harness" as H1
 participant "Bridge\n(M3)" as BR
 participant "Composer\n(curator-run)" as C
 database "B1 Task store\n(board sessions)" as B1
-participant "Holder +\nnew harness" as H2
+participant "Fresh agent-side runner +\nnew harness" as H2
+participant "Launch dispatcher" as D
+participant "User manager / launcher" as UM
 
 Op -> SH: restart(session, controlled), signed control envelope
 SH -> SH: admit(control.restart): grant, target, fence state
@@ -43,29 +46,44 @@ else drained
   end
 
   == Stop with confirmed absence ==
-  SH -> H1: SIGTERM process group, wait, SIGKILL
-  H1 --> SH: exit status; process group empty;\nnative session lock released
+  SH -> D: host_stop under session-scoped permit
+  D -> UM: journaled E-stop: exec.stop with latest execution receipt
+  UM -> UM: account-wide generation-UID stop and quiet-period absence;\nincluding escaped and OS-spawned processes (user manager §4.7)
+  UM --> D: authoritative process-absence result (no native-lock proof)
+  D --> SH: stop result; same-effect recovery on unknown
+  note over SH, D: Unknown retains fence, claim and capacity; no host-owned signals
   alt absence not confirmed
     SH --> Op: stop_unconfirmed; no replacement; fence stays closed
   else absent
     == Eligibility ==
     SH -> C: compare-only (profile_pin, fragment digest, system-modules)
     C --> SH: current digests (no plan)
-    SH -> SH: compare stored plan pins, effective posture,\nbinding rev, grants, auth readiness, runtime probe
+    SH -> SH: compare stored plan pins, effective posture,\nbinding rev, grants, auth readiness, approved artifact, ordinary startup qualification;\nD-RESUME semver; R-STANDING surface digests
     alt any mismatch or failure
       SH -> HS: session state parked_refused{reason}; fence stays closed
       SH --> Op: refused{reason}. Path ends: no rebind, no delivery.\nAccepting drift is a new operation that rebuilds
     else eligible
-      SH -> H2: exec stored immutable plan (ax resume of the record),\nnew generation, new session token
-      SH -> CE: initialize: native resume (same home, pin, transcript)
-      CE -> H2: native resume
+      SH -> D: successor host_start under owner session lifecycle authorisation\nand session permit; previous claim confirmed absent
+      D -> D: per-start claim (execution_id, controller_epoch, op_id);\ncurrent authority and receipt interlock (dispatcher §12)
+      D -> UM: invoke privileged launcher; stored immutable plan
+      UM -> H2: fresh runner under agent UID; new execution-local generation
+      H2 -> SH: current-epoch registration via jointly gated channel\n(proof unpublished; session host §3.3)
+      H2 -> H2: check native-lock absence under closed fence;\nseparate from process absence
+      break native lock unknown or held
+        H2 --> SH: park; delivery stays closed; no harness initialisation/resume
+      end
+      SH -> CE: initialize native resume (same machine, home, pin, transcript, transport)
+      CE -> H2: native resume; same major, same minor for 0.x\n(no extra version-change probe; per-harness semver exception note)
       CE -> H2: readiness probe
       alt init or readiness fails
-        SH -> H2: compensate: stop, confirm absence
-        SH --> Op: init_failed; fence stays closed
+        SH -> D: compensate via host_stop and account-wide absence
+        SH --> Op: resume-failed if harness resume failed; caller decides;\nno automatic/portable-seed fallback; fence stays closed
       else ready
-        SH -> CE: reconcile unknown deliveries (input markers);\nhistorical approvals void
-        SH -> HS: fence.open(op_id), fsync
+        SH -> CE: reconcile input markers: applied resolves without replay;\nconfirmed non-application permits only eligible ordinary-input retry;\nunresolved stays unknown; unknown approvals/control never auto-replay
+        break unresolved application evidence
+          SH --> Op: unknown; delivery stays closed; status/authorised stop reachable
+        end
+        SH -> HS: fence.open(op_id) only after registration, readiness and reconciliation, fsync
         CE -> H2: dispatch queued items in order
         CE -> BR: receipts dispatched / applied
         SH --> Op: restart report (op_id, handoff_ref, applied, pending, unknown)

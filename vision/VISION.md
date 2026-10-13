@@ -3,6 +3,8 @@
 Status: PROPOSAL **v1.3** (draft on top of v1.2; owners' call of 2026-10-07 folded in as §0). v1.2 by the solution architect, 2026-10-05. Not canon; the reviewed revision was v1.1 (fa4fbc68). Sources: `00-owner-concept.md` (intent), `research/INVENTORY-OURS.md` (OURS), `research/INVENTORY-IVANS.md` (IVANS), `research/herdr-study.md` (HERDR), `research/tb-keeper-answer-2026-10-05.md` (TBK), `research/curator-advice-2026-10-05.md` (CUR), the curator-playbook spec v4.8 (PB; external, curator repo, `research/playbook/` is **not** in this snapshot). Review round: `research/joint-review-sol-2026-10-05.md` (JR; B = the R191 package, cited H/C/F as there) and `research/pr1-reviews-2026-10-05.md` (tb-keeper = TBK-R, ivan-curator = CUR-R). Detailed contracts: `vision/contracts/*.md`. Owner decisions: `vision/DECISIONS-FOR-OWNERS.md`. Diagrams: `diagrams/`. Flow example (illustrative, non-activatable): `vision/flows/swarm-project.Playbook.json`.
 This design and Ivan's R191 package cover the same layer and go to ONE architecture review (TBK). v1.2 converges on B's supervisor/holder split, host-enforced admission, delivery evidence and restart fences (JR §5).
 
+Updated 2026-10-13: accepted architecture-review findings (2026-10-13), aligned to the canonical module contracts; no implementation or activation is claimed.
+
 ## 0. v1.3 changes (owners' call 2026-10-07, Ivan and Alexis)
 
 Decisions of both owners, recorded in the wiki ledger (`decisions.md`, "2026-10-07 call") with the Russian digest `research/call-digest-2026-10-07.ru.md`. This section says what changes in the model; contracts are amended where noted and the diagrams are updated (`diagrams/`, new sequences listed in its README).
@@ -51,12 +53,12 @@ Contract text lives in `vision/contracts/`: `trust-and-isolation.md` (TRU, v1.3:
 | TBK-R 1 migration | Operator-gated: fork, gated merge-back, operator-run R55 binary swap in the maintenance slot; no agent restarts daemons. §5.6, §8; RST §6 |
 | TBK-R 2 testable narrowing | Conformance suite (one negative fixture per rule and per K, load-time and runtime) + PC1 behaviour-equivalence gate (full spm suite + regress unchanged). KG §4 |
 | TBK-R 3 capacity | S3 `admit_host` with disk (R72/R167), CPU-idle (R112), build lock (tb-R193), syspolicyd (tb-R194) and slots; consulted by M4 and rechecked by the host before exec. LCH §5 |
-| TBK-R 4 session token | Same-UID guardrail; scoped to the session's own bindings; only `goal` and `park` need no mandate; `post` (and `inbox read`) need a binding grant, `post` rate-limited and audited. ADM §6 |
+| TBK-R 4 session token | Same-UID guardrail; scoped to the session's own bindings; passive `park` needs no mandate; D-GOALS defers agent self-goals to SH2+ G2; `post` (and `inbox read`) need a binding grant, `post` rate-limited and audited. ADM §6 |
 | TBK-R 5 no-progress | Shadow mode in the D4 trial with an activation gate; a blocked result (detector or agent) on a board goal is a notice, never a transition. GOL §5, §3 |
 | TBK-R 6 landing | Open item O1 in §7: shared-main landing coordination stays protocol (S5/arbitration), not B2 or B6 |
 | CUR-R 1 profile pin | `profile_digest` renamed `profile_pin`; `expect_pin` on LaunchRequest, refused before intake; pin on `RUN-*`, StatusRecord, `board_ref`; role → profile in the S4 binding. LCH §2–§3; KG §5 |
 | CUR-R 2 permission wire | agents-management spells session-start parameters; M2 forwards verbatim; `hosted-stream/1` refuses before any process exists; plan stdin null. LCH §6 |
-| CUR-R 3 CIP-0003 | M1 does protected lookup; plan carries opaque `source_ref`; board records `credential_mode` only; CIP-0003 amendment proposed; logins re-estimated. LCH §7; §7 Q5 |
+| CUR-R 3 CIP-0003 | D-EXECUTOR: only the admitted agent-side executor re-resolves the protected binding and leases after the UID drop; plan carries opaque `source_ref`; board records `credential_mode` only; host and board runner have no broker client. LCH §7; §7 Q5 |
 | CUR-R 4 remote | Intent carries `{profile, profile_pin}`; target composes and refuses on mismatch; cross-host compare pin only and always rebuild; no M4 bundle; standing worker needs the pin. LCH §8; diagram `remote-worker-start` |
 | CUR-R 5 resume | Compare, then `ax` resume of the stored record; new plan only for rebuild; strict mode stated; CIP-0002 lease to M1. RST §3 |
 | CUR-R 6 goal argv | No `--goal`; goal from JSON/stdin; remote task as M2's first turn; `native_goal` boolean. LCH §2, §8 |
@@ -75,7 +77,7 @@ Goals:
 2. One launch path for every agent: local or remote, interactive or headless. One composer builds the plan, the session host runs it. The launch gets exactly the declared instructions, skills, MCP and commands (CIP-0002 strict project-context mode), and Claude/Codex auth survives through Curator tool homes.
 3. Agent I/O is wrapped. Carriers (Matrix/a2a, later XMPP and Telegram), goals and the board inject into an agent's context and consume its output through one bridge, behind admission that the host enforces.
 4. Contexts are portable: crash, reboot, refresh, model change or takeover restore a session from a recipient-authorized handoff package; a spawned child can receive a slice.
-5. A "smart Ralph loop": an agent sets and clears its own goal, and the goal provider nudges it through stdin until it is done or blocked.
+5. A caller/board-authored goal loop (D-GOALS, session host §3.8): the launching caller supplies an initial goal, or the optional board/orchestrator authors board revisions; the provider schedules bounded nudges. Agent self-goals are deferred to SH2+ G2. Goal-free operation and passive park notes remain supported; no board-free agent completion path is specified.
 6. A board whose flows are configured outside the code (Playbook.json), under kernel guards that a flow can only narrow. A transition spawns the role through the same launch path.
 7. Phase 0 runs on parts that exist today, with their current guarantees. New code is written only where nothing exists.
 
@@ -153,10 +155,10 @@ Project attachment of remotes is the versioned project binding in S4 (LCH §3). 
 - Plugins: `swarm-plugin/1` (PLG §1). Host → plugin: `bind{binding_handle, config}`, `unbind`, `output{binding_handle, projected event}`, `receipt`, `shutdown`. Plugin → host: `manifest`, `envelope`, `cursor`, `health`, `secret.resolve`.
 - Envelope `swarm-envelope/2` and verdicts `authoritative | host_authored | agent_authored | data | quarantine | reject` (ADM §2–§3). Unsigned bodies become doorbells (D-R2). Framing is supplementary.
 - Trust gate checks in order: signature over exact bytes → enrolled identity → grant scope for `action` and `target` → freshness, replay, id claim → binding revision. The host re-checks at enqueue and at dispatch.
-- **Tails**: `swarm-tail goal|park` (no mandate), `post`, `inbox read` (binding grant; `post` rate-limited and audited), authenticated by `SWARM_SESSION_TOKEN`, a same-UID guardrail scoped to the session's own bindings (ADM §6).
+- **Tails**: passive `swarm-tail park` (no mandate; no goal mutation), `post`, `inbox read` (binding grant; `post` rate-limited and audited), authenticated by `SWARM_SESSION_TOKEN`, a same-UID guardrail scoped to the session's own bindings (ADM §6).
 
 ### 4.6 Goals (smart Ralph loop and board goals)
-GOL. Board goal revisions live in B1 (CAS, slots); board-free goals live in the host goal ledger; the goal provider only schedules nudges through `enqueue`. A board `clear --done` is an outcome proposal; `--blocked` and detector results are notices, never transitions. The no-progress detector runs in shadow mode during the D4 trial and has an activation gate. Goals never enter argv, the system prompt or managed surfaces (env §5.6). This answers 0021 open question 5 and is filed there.
+GOL, D-GOALS (session host §3.8). Board goal revisions live in B1 (CAS, slots); an initial board-free goal is authored only by the launching caller at start; the host ledger retains delivery progress, and the goal provider only schedules nudges through `enqueue`. The agent account has no goal-authoring capability; self-goals await SH2+ G2, with goal-client actions/capability shape and a board-free completion path unpublished. Goal-free operation, passive park notes and SH1 board compatibility remain. A board `clear --done` is an outcome proposal; `--blocked` and detector results are notices, never transitions. The no-progress detector runs in shadow mode during the D4 trial and has an activation gate. Goals never enter argv, the system prompt or managed surfaces (env §5.6). This answers 0021 open question 5 and is filed there.
 
 ### 4.7 Trust (M5)
 - v1.3: the full trust and isolation model — identities and the key keeper, grants with attenuation-only delegation, the registered action vocabulary and handlers, one OS user per agent, the three entry channels, remote workplaces and provider credentials — is in **TRU** (`contracts/trust-and-isolation.md`).
@@ -170,7 +172,7 @@ GOL. Board goal revisions live in B1 (CAS, slots); board-free goals live in the 
 | S1 router | `route(task_class \| needs, difficulty, env?) -> {model, effort, reason}`; shadow mode logs only |
 | S2 network | `resolve(profile) -> egress policy`; `probe(adapter)`; enforced by the execution owner (host, M6 / remote workplace) and rechecked on resume |
 | S3 capacity (= B6) | `admit_host(host, job_class) -> lease \| refused{gate}` (disk R72/R167, CPU-idle R112, build lock tb-R193, syspolicyd tb-R194, slots), `release(lease)`, `transfer(lease, owner)`, `queue(validation_job) -> evidence` (FIFO). Bridge parser/replay budgets are separate and not in S3 |
-| S4 registry | `products()`, `projects(product)`, `binding(project) -> swarm-project-binding/1`, `processes()`, `up()` (reboot → M1 `resume`, the only automatic restore requester) |
+| S4 registry | `products()`, `projects(product)`, `binding(project) -> swarm-project-binding/1`, `processes()`, `up()` (historical reboot-requester proposal; host vs registry selection remains open under the owner's admitted session lifecycle authorisation; RST §5) |
 | S5 chat | `space/room/identity ensure` (identity under mandate), `card set`; naming `<host>_<project>_<role>`; carrier membership is not app authority |
 | S6 env | `env resolve <env> --profile <p> --format json -> launch-env-fragment` (v3 now, one coordinated v4); compare-only pin answers for resume |
 
@@ -289,7 +291,7 @@ Conflicts with the R191 package, D-R1 to D-R8: **`vision/DECISIONS-FOR-OWNERS.md
 | Q2 | Headless permissions | `native` now: `interaction.pending` → ask → `approval.answer` with CAS (PLG §2); the posture is spelled by agents-management (LCH §6). `yolo` only with the versioned capability (D-R1). |
 | Q3 | M1 intake via `ax start --launch-plan`? | Yes, as a contract the host implements; no `ax` implementation dependency. |
 | Q4 | Remote resolution | Launch intent with `profile_pin`; the target composes and refuses on mismatch; no M4 bundle (LCH §8). |
-| Q5 | Unattended Claude credentials | **Changed:** M1 as the final executor does protected lookup with an opaque `source_ref`, via a CIP-0003 amendment; per-home login until then (homes = checkout × profile × env; LCH §7). |
+| Q5 | Unattended Claude credentials | **Settled boundary (D-EXECUTOR):** `curator-run` under the agent account, later `swarma-session-runner` sharing the launch library, re-resolves the protected binding and leases after the UID drop; M1 and the board runner have no broker client. Decision 0021's adopted amendment and remaining executor publication/qualification gates are described in LCH §7; no automatic per-home fallback. |
 | **O1** | **Shared-main landing coordination** (TBK-R 6) | **Open, outside the platform.** Landing windows and rulings are arbitration protocol (S5 or the protocol repo). Neither B2 nor B6 provides them; K3 only guarantees each landing's own transaction. Owner: the arbitration side (tb-keeper), to be named in the joint review. |
 | O2 | `pi` runtime adapter | Deferred: no M2 adapter; `tty` interactive only. |
 | O3 | Mode S | Deferred: no path claims it until a broker/OS boundary is evidenced. |

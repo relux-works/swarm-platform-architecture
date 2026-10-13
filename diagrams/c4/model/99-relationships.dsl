@@ -1,3 +1,4 @@
+# Updated: accepted architecture-review findings (2026-10-13)
 # People
 owner -> matrix "Talks to keepers in product spaces"
 owner -> platform.trust "Signs mandates, grants and authoritative envelopes" "mandate CLI"
@@ -20,7 +21,7 @@ platform.launcher -> platform.trust "Consumes mandate for privileged steps" "man
 
 # Session host internals
 platform.sessionHost.supervisor -> platform.sessionHost.admission "Every typed mutation; fence changes" "admit(), fence"
-platform.sessionHost.supervisor -> platform.sessionHost.holder "Starts, stops, confirms absence" "controller epoch"
+platform.sessionHost.supervisor -> platform.sessionHost.holder "Fences and controls the current registered runner; start/stop via dispatcher" "controller epoch"
 platform.sessionHost.supervisor -> platform.composer "Compare-only pin answer on resume; new plan only for rebuild" "compose-only"
 platform.sessionHost.supervisor -> platform.sessionHost.contextEngine "Export, seed, reconcile unknown deliveries (opaque refs only)" "Go API"
 platform.sessionHost.supervisor -> platform.providerLimits "Rechecks gates before exec; holds the transferred lease" "admit_host/release"
@@ -32,7 +33,7 @@ platform.sessionHost.contextEngine -> platform.sessionHost.journal "Appends even
 platform.sessionHost.adapters -> platform.sessionHost.holder "Turn input and output" "framed pipes / PTY"
 platform.sessionHost.holder -> platform.harness "Execs and holds the process" "process group"
 platform.sessionHost.goalLedger -> platform.sessionHost.journal "Stores goals and delivery records" "CAS"
-platform.registry -> platform.sessionHost.supervisor "Requests restore after reboot (only automatic requester)" "up() -> resume()"
+platform.registry -> platform.sessionHost.supervisor "Illustrative reboot requester proposal; host vs registry remains open" "up() -> resume()"
 
 # Bridge internals
 platform.bridge.bridgeCore -> platform.bridge.trustGate "Checks every inbound envelope" "verify()"
@@ -40,12 +41,12 @@ platform.bridge.trustGate -> platform.trust "Verifies signatures, grants, mandat
 platform.bridge.bridgeCore -> platform.bridge.bridgeStore "Atomic id claim and admission record; outbox; audit" "local transaction"
 platform.bridge.bridgeCore -> platform.sessionHost.admission "Durable idempotent enqueue; acceptance after host ack" "enqueue(idem_key)"
 platform.bridge.bridgeCore -> platform.sessionHost.contextEngine "Observes projected output, receipts" "observe()"
-platform.bridge.bridgeCore -> platform.sessionHost.goalLedger "Goal calls on behalf of tails and the goal provider" "goal.* (typed)"
+platform.bridge.bridgeCore -> platform.sessionHost.goalLedger "Caller/board-authored goals and scheduler delivery; no agent goal capability (session host §3.8)" "goal-client surface unpublished"
 platform.bridge.bridgeCore -> platform.bridge.pluginApi "Runs provider processes through" "JSONL"
 platform.bridge.pluginApi -> platform.bridge.matrixProvider "bind/output/receipt" "swarm-plugin/1"
 platform.bridge.pluginApi -> platform.bridge.goalProvider "bind/output/receipt" "swarm-plugin/1"
 platform.bridge.pluginApi -> platform.bridge.terminalProvider "bind/output" "swarm-plugin/1"
-platform.bridge.tails -> platform.bridge.bridgeCore "goal, park, post, inbox read" "unix socket + session token"
+platform.bridge.tails -> platform.bridge.bridgeCore "park (passive), post, inbox read; SH1 board outcome proposals" "unix socket + session token"
 platform.harness -> platform.bridge.tails "Agent runs tail commands" "shell tool"
 platform.bridge.matrixProvider -> matrix "Subscribes and posts" "a2a / Matrix CS API"
 platform.bridge.goalProvider -> platform.providerLimits "Checks nudge budget" "acquire()"
@@ -87,15 +88,14 @@ platform.board.spawn -> platform.dispatcher "spawn = dispatch(LaunchRequest); RU
 platform.dispatcher -> platform.trust "Checks the spawn grant and attenuation-only delegation" "granted()"
 platform.dispatcher -> platform.providerLimits "Local capacity: slots, disk, CPU" "admit_host()"
 platform.dispatcher -> platform.workplace "Creates and removes OS users, homes and firewall rules through the privileged helper" "sudo helper"
-platform.dispatcher -> platform.keyKeeper "Registers the new UID to its identity path; requests revocation at retire" "register/revoke"
+platform.dispatcher -> platform.keyKeeper "Generation-bound registration; detach before UID reuse; separately revoke only its recorded one-shot identity after retirement" "register/revoke"
 platform.dispatcher -> platform.launcher "Launches as the new OS user" "curator run"
 platform.sessionHost.holder -> platform.workplace "Execs the harness as the agent's OS user" "setuid exec"
 platform.harness -> platform.keyKeeper "Asks for signatures of its outbound messages; the key never leaves the keeper" "unix socket, peer UID"
-platform.bridge.bridgeCore -> platform.keyKeeper "Signs outbound items on behalf of the posting agent" "unix socket"
 platform.bridge.trustGate -> platform.bridge.decisionGuard "Admitted message checked against the addressee's grants before the doorbell" "verdict + fingerprint"
 platform.bridge.decisionGuard -> platform.bridge.mailbox "Stores the body with its verification record" "append"
 platform.bridge.tails -> platform.bridge.mailbox "inbox read returns the body and the verification record" "binding grant"
-platform.sessionHost.supervisor -> platform.credentialBroker "Resolves the credential source_ref at exec: env token, helper, or shared file" "lease request, peer UID"
+platform.sessionHost.holder -> platform.credentialBroker "Re-resolves protected binding; receives admitted lease material after UID transition" "fresh Unix socket, bound agent peer UID"
 platform.credentialBroker -> owner "Relays the vendor's re-login flow and lease approvals" "phone confirmation"
 platform.workplace -> platform.networkProfiles "Kernel firewall per UID admits only the message broker and the egress proxy" "pf / nftables"
 platform.remoteWorkplace -> platform.bridge.mailbox "Remote agents receive tasks through the mailbox like local ones" "signed messages"

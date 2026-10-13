@@ -1,8 +1,9 @@
 @startuml context-takeover
 !theme plain
+' Updated: accepted architecture-review findings (2026-10-13)
 title Context takeover: crash or reboot -> fence -> confirmed absence -> eligibility -> seed or native resume -> reconcile -> release
 
-participant "Product registry\n(S4 keeper up)" as Reg
+participant "Product registry\n(illustrative requester proposal)" as Reg
 participant "Session host\n(M1 supervisor)" as SH
 database "Host store\n(fences, journal,\nprotected source)" as HS
 participant "Composer\n(curator-run)" as C
@@ -10,18 +11,31 @@ participant "Context Engine\n(M2, host package)" as CE
 participant "Bridge\n(M3)" as BR
 participant "Matrix provider" as MP
 participant "Old holder +\nharness" as H1
-participant "New holder +\nharness" as H2
+participant "Fresh agent-side runner +\nnew harness" as H2
+participant "Launch dispatcher" as D
+participant "User manager / launcher" as UM
 
 alt harness crash
   H1 -> SH: process exited (non-zero)
   SH -> HS: fence.close(op_id, reason=crash), fsync
-  SH -> SH: confirm absence: process group empty,\nnative session lock released
+  SH -> D: host_stop under permit; reconcile current claim
+  D -> UM: journaled exec.stop; latest-execution-receipt fencing
+  UM -> UM: account-wide generation-UID absence over quiet period\n(including escaped processes; user manager §4.7)
+  UM --> D: process-absence result only
+  D --> SH: confirmed absent or unknown; same-effect recovery
+  note over SH, D: Unknown retains fence, claim and capacity
   SH -> CE: export(restore projection, audience=same_session)
   CE -> HS: HandoffPackage at watermark H\n(refs into protected source, per-item provenance)
 else host reboot
-  SH -> HS: read every fence first; boot_id changed = absence evidence
+  SH -> HS: read every fence first; changed boot_id
+  SH -> D: reconcile boot evidence and previous claim absence
   SH -> SH: sessions awaiting_restore (explicit stops stay stopped)
-  Reg -> SH: up(): request restore per registered session
+  note over Reg, D
+    Historical registry-only route is a requester proposal, not a selection.
+    Host vs project registry requester remains open (host §7; dispatcher §§12/16).
+    Any selected requester stays within owner session lifecycle authorisation.
+  end note
+  Reg -> SH: illustrative restore request per admitted session
   SH -> HS: last committed package per session
 end
 
@@ -30,7 +44,7 @@ alt absence not confirmed
 else absent
   SH -> C: compare-only (profile_pin, fragment digest on the same host)
   C --> SH: current digests
-  SH -> SH: compare pins and posture; binding rev; grants;\nauth readiness; runtime resume probe; goal revision current
+  SH -> SH: compare pins and posture; binding rev; grants;\nauth readiness; approved artifact, ordinary startup qualification;\nD-RESUME semver; R-STANDING surface digests; goal revision current
   alt drift or any check fails
     SH -> HS: parked_refused{reason}; fence stays closed
     SH -> BR: notice refused{reason}: operator decides (accepting drift = new operation, rebuild)
@@ -39,26 +53,43 @@ else absent
       no replay, no "restored" notice.
     end note
   else eligible
-    SH -> H2: exec stored plan, new generation
-    alt native_resume allowed (same runtime range, home, pin, transcript digest, exclusive custody)
-      CE -> H2: native resume (native_session_ref)
+    SH -> D: host_start under owner lifecycle authorisation and session permit;\nprevious claim absent; distinct per-start claim and receipt interlock
+    D -> UM: privileged launcher with stored admitted plan (dispatcher §12)
+    UM -> H2: fresh agent-side runner under agent UID; new execution-local generation
+    H2 -> SH: current-epoch registration (jointly gated; proof unpublished)
+    H2 -> H2: check native-lock absence under closed fence, separately from process absence
+    break native lock unknown or held
+      H2 --> SH: remain parked; no harness initialisation/resume
+    end
+    alt native_resume allowed (same machine, non-breaking semver, home, pin, transport, transcript)
+      CE -> H2: native resume (same major; same minor for 0.x;\nno extra version-change probe; per-harness exception note)
+      break harness resume fails
+        SH -> D: compensate via host_stop and account-wide absence
+        SH -> BR: resume-failed to caller; caller decides; fence closed;\nno automatic or portable-seed fallback
+      end
     else takeover across profile or runtime
       CE -> CE: seed import: re-authorize audience, pins,\ngoal revisions, every item by its verdict
       alt seed check fails
-        SH -> H2: compensate: stop, confirm absence
+        SH -> D: compensate via host_stop and account-wide absence
         SH -> BR: notice refused{seed}; fence stays closed
+        break seed refused
+          SH -> SH: path ends; no rebind, release or restored notice
+        end
       else seed ok
         CE -> H2: first framed turn (host_authored frame;\nitems keep their own verdict labels)
       end
     end
     SH -> CE: reconcile unknown deliveries (input markers in transcript)
-    CE -> CE: applied / not_applied / unknown;\napprovals and control never replayed
+    CE -> CE: applied evidence resolves without replay; confirmed non-application\npermits only eligible ordinary-input retry; unresolved stays unknown;\nunknown approvals/control never auto-replay (ADM §5)
+    break initialisation/readiness fails or evidence unresolved
+      SH -> SH: keep delivery fence closed; status/authorised stop reachable
+    end
     SH -> BR: rebind io_bindings (same handles, binding rev rechecked)
     BR -> MP: bind{binding_handle}
     MP -> BR: envelopes after its own cursor
     BR -> BR: id claims: duplicates return the old receipt
     BR -> SH: enqueue(idem_key) for new items
-    SH -> HS: fence.open(op_id), fsync
+    SH -> HS: fence.open(op_id) only after current-epoch readiness and reconciliation, fsync
     CE -> H2: dispatch queued items in order
     opt goal active
       BR -> SH: goal provider nudges resume via enqueue (goal ledger revision)

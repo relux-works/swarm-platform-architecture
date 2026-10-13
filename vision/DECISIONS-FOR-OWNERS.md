@@ -2,6 +2,8 @@
 
 For Alexis + Ivan, 2026-10-05. A = VISION (this repo); B = the R191 package (agent-session-host PR #11 = H, agent-session-bridge PR #1 = C, session-split PR #1 = F). Source: `research/joint-review-sol-2026-10-05.md` §3. Recommendations are advice only; VISION v1.2 applies them as proposals until you record a decision. Each line: **A** / **B** / **Evidence** / **Rec.**
 
+Updated 2026-10-13: accepted architecture-review findings (2026-10-13); D-R5 aligned to the adopted D-RESUME decision.
+
 **D-R1: permission default and tracked yolo.**
 A: silence = `native`; tracked `yolo` refused until a versioned ax capability exists. B: hosted sessions default to `yolo` unless configured; tracked refusal removed.
 Evidence: 0018 item 5, curator advice §43, VISION §4.1; H:851–853.
@@ -25,7 +27,7 @@ Evidence: H:732, 867–869; F:26; both advice rounds.
 **D-R5: native resume, rebuild and harness upgrades.**
 A: preserve when runtime, home and pin are the same, else rebuild; drift refuses. B: preserve-TUI and rebuild-structured are negotiated separately; journal H, linkage and fidelity; optimistic binary updates with last-known-good fallback.
 Evidence: H:708–744, 835–850.
-**Rec.:** keep drift refusal and add a separate runtime-version policy. A new binary resumes natively only after a resume probe. Continuity and transport are separate axes, there is no unsupported conversion, and rebuild fidelity is stated. Fallback stays off until native state compatibility is frozen (`contracts/restart-and-takeover.md` §4).
+**Resolved by D-RESUME (2026-10-11):** the extra version-change probe recommendation is superseded. On the same machine, native resume allows a non-breaking semver change (same major; same minor for 0.x) without an extra qualification row. Keep ordinary startup qualification, approved artifact identity, harness-surface checks, native lock, home/profile/transport, auth/grants and transcript integrity; record per-harness notes for vendors known not to follow semver. A harness failure is reported as `resume-failed`; the caller decides. No automatic or portable-seed fallback on this path (session host §§3.5–3.6; wiki D-RESUME; `contracts/restart-and-takeover.md` §4).
 
 **D-R6: carrier order and privacy.**
 A: Matrix first because a2a is live. B: XMPP is the first product-carrier candidate; Matrix is doorbell-first; E2E and device lifecycle are not frozen.

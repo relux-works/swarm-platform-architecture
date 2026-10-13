@@ -1,5 +1,6 @@
 @startuml spawn-with-user
 !theme plain
+' Updated: accepted architecture-review findings (2026-10-13)
 title Spawn through the dispatcher (v1.3): grant check without amplification, capacity, OS user, key, launch, result, retire
 
 participant "Orchestrator\n(OS user orch_a)" as O
@@ -28,15 +29,17 @@ else granted
     D --> O: queued | refused
   else lease
     D -> PH: create user w_17: private home 0700 under the agents tree, no parent ACL,\nfirewall: only its own listener of the bound profile, model-provider endpoints only (F-27; owner 2026-10-13)
-    PH --> D: uid
-    D -> KK: register(uid, path product/P/w_17')
+    PH --> D: uid, account generation
+    D -> KK: register (uid, generation, identity path, owner, registration generation);\nrecord one-shot flag (API unpublished; dispatcher §14 gate)
     KK --> D: public key + root signature (registry record)
     D -> T: bind role developer -> identity w_17 for project P\n(signed by the dispatcher under the owner's delegable grant)
-    D -> L: launch as w_17 (compose-only plan, expect_pin)
+    D -> L: caller-side compose-only plan, expect_pin for admitted worker
     L -> SH: intake; fence closed
-    SH -> CB: resolve credential source_ref for the harness\n(env token | helper | shared file), peer UID = host
-    CB --> SH: material for this launch only
-    SH -> W: exec under a holder as uid w_17
+    SH -> D: host_start under admitted permit (jointly gated)
+    D -> PH: invoke approved privileged launcher with immutable plan
+    PH -> W: drop UID; start admitted agent-side executor/holder
+    W -> CB: re-resolve protected binding; fresh broker connection after UID drop
+    CB --> W: lease material for this admitted launch only (D-EXECUTOR)
     L -> BR: bind(thread, audience); mailbox for w_17
     SH -> SH: token, readiness, fence open
     SH --> D: RUN{request_id, identity w_17, execution}
@@ -51,8 +54,13 @@ BR -> B: outcome proposal (B5)
 B -> B: accept or refuse; review by the playbook
 
 == retire ==
-D -> SH: stop; confirm absence
+D -> PH: journaled exec.stop; latest receipt; account-wide absence
+PH --> D: confirmed account-wide process absence before retirement proceeds
 D -> PH: delete home (only the service-generated metadata export is kept, F-1),\ndelete user w_17, remove firewall rules last
-D -> KK: revoke(identity w_17) → root-signed revocation record
+D -> KK: detach active registration before UID reuse
+opt registered one-shot flag, same registering dispatcher, retirement confirmed
+  D -> KK: separate journaled identity revocation (same effect on retry)
+end
+note over D, KK: Standing identity survives retirement; operator-signed revocation only
 D -> T: revocation snapshot refreshed
 @enduml

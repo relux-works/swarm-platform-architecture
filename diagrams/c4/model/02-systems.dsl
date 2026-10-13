@@ -1,3 +1,4 @@
+# Updated: accepted architecture-review findings (2026-10-13)
 platform = softwareSystem "Swarm Platform" "Holds agent sessions, wraps their I/O, launches local and remote agents" {
 
   launcher = container "Launcher (thin client)" "Launch transaction: prepare, capacity, compose, compare expect_pin, admit, start, initialize, ready, with compensation. Never reads a fragment or store content, spells a flag, execs or holds" "curator run (canonical) / swarm launch (optional wrapper)"
@@ -5,12 +6,12 @@ platform = softwareSystem "Swarm Platform" "Holds agent sessions, wraps their I/
   composer = container "Composer" "The only composer and fragment reader: resolves the role profile, builds one Decision 0013 plan (interactive, headless, hosted-stream with session-start permission frames); compose-only and compare-only answers" "curator-run + agents-management (one construction site)"
 
   sessionHost = container "Session Host (M1 + M2)" "One codebase: supervisor, minimal execution holders, host-enforced admission and fences, Context Engine package, goal ledger, host-owned journal" "agent-session-host (Phase-0 baseline: tb-sessiond)" {
-    supervisor = component "Supervisor (M1)" "Plan intake (ax start --launch-plan contract, strict mode), session/execution registry, controller epochs, restart, resume, takeover, reconciliation, protected credential lookup at exec" "Go"
+    supervisor = component "Supervisor (M1)" "Plan intake (ax start --launch-plan contract, strict mode), session/execution registry, controller epochs, restart, resume, takeover, reconciliation; no broker client or credential lookup" "Go"
     admission = component "Admission and Fences" "admit() at every typed mutation; persisted admission fence open/closed/update_lock; durable idempotent enqueue (ack after fsync)" "Go"
-    holder = component "Execution Holder" "One per execution: native process, PTY or framed pipes, exclusive input lease; no goal, board, carrier or journal semantics" "Go process"
+    holder = component "Execution Holder" "Agent-side executor/holder under the bound agent UID: first curator-run, later swarma-session-runner sharing its launch library; verifies supplied plan, protected credential lookup and fresh broker connection after UID drop; native process, PTY or framed pipes, exclusive input lease; no goal, board, carrier or journal semantics; intake and SH2+ activation gated" "Go process"
     contextEngine = component "Context Engine (M2)" "Dispatcher (the only stdin writer), delivery evidence, interactions, export/seed of swarm-handoff/2, resolve_ref, egress projections" "Go package"
     adapters = component "Harness Adapters" "claude-stream-json, codex-app-server, muse-serve (hosted-stream/1), pty-preserve; readiness grammar pinned per release; unknown parks" "Go package"
-    goalLedger = component "Goal Ledger" "Board-free goals (CAS, caller-derived author, budgets) and delivery records for board goal revisions" "Go package"
+    goalLedger = component "Goal Ledger" "Caller-authored initial goals (D-GOALS; CAS and budgets) and delivery records for board revisions; agent self-goals deferred to SH2+ G2" "Go package"
     journal = component "Host Store" "Journal, durable inbox, fences, plans, protected source storage (transcripts, tool outputs, patches)" "Files, append-only, owner-only" {
       tags "Store"
     }
@@ -31,7 +32,7 @@ platform = softwareSystem "Swarm Platform" "Holds agent sessions, wraps their I/
     mailbox = component "Mailbox" "Held bodies with their verification records, fetched by the agent through its tool (inbox read); In and Out" "Files, append-only" {
       tags "Store"
     }
-    tails = component "Tails CLI" "swarm-tail goal and park (no mandate); post and inbox read (binding grant; post rate-limited and audited); session token = same-UID guardrail" "CLI"
+    tails = component "Tails CLI" "Passive swarm-tail park (no mandate); SH1 board outcomes are proposals; no agent goal capability, self-goals deferred to G2; post and inbox read require binding grants; token = same-UID guardrail" "CLI"
     matrixProvider = component "Matrix Provider" "Subscribes to rooms and threads, persists before advancing the cursor, emits envelopes, posts projected output" "Child process over a2a" {
       tags "Plugin"
     }
@@ -53,7 +54,7 @@ platform = softwareSystem "Swarm Platform" "Holds agent sessions, wraps their I/
 
   keyKeeper = container "Key Keeper" "Master secret in hardware-backed storage; hierarchical key derivation per agent identity (never per OS path); signs and decrypts on request over a local socket, identifying the caller by peer UID; publishes the root and descendant signatures; never releases a private key" "privileged daemon"
 
-  credentialBroker = container "Credential Broker" "Holds long-lived provider logins; hands each launch what its harness consumes (one-year token in env, API key through the helper command, shared file); tracks expiry; relays the vendor's own re-login flow to the operator's phone" "privileged daemon"
+  credentialBroker = container "Credential Broker" "Holds long-lived provider logins; hands each launch what its harness consumes (node-backed token in env or API key through the admitted helper mode; material only to the admitted agent-side executor/holder after UID transition); tracks expiry; relays the vendor's own re-login flow to the operator's phone" "privileged daemon"
 
   workplace = container "Agent Workplace" "One OS user per autonomous agent: private home (0700, no parent ACL), kernel firewall admitting only the message broker and the egress proxy; created and removed by the dispatcher's helper; the unit of mode S" "OS user + kernel firewall"
 
