@@ -161,7 +161,7 @@ SwarmPlatform.Launcherthinclient --> SwarmPlatform.CapacityS3 <<Relationship-UmV
 SwarmPlatform.Launcherthinclient --> SwarmPlatform.SessionHostM1M2 <<Relationship-UmVsYXRpb25zaGlw>> : "Hands the composed plan to intake; drives initialize\n<size:16>[ax start --launch-plan contract]</size>"
 SwarmPlatform.Launcherthinclient --> SwarmPlatform.BridgeM3.BridgeCore <<Relationship-UmVsYXRpb25zaGlw>> : "Binds I/O providers at initialize\n<size:16>[bind()]</size>"
 SwarmPlatform.Launcherthinclient --> SwarmPlatform.Trust <<Relationship-UmVsYXRpb25zaGlw>> : "Consumes mandate for privileged steps\n<size:16>[mandate consume]</size>"
-SwarmPlatform.SessionHostM1M2 --> SwarmPlatform.CapacityS3 <<Relationship-UmVsYXRpb25zaGlw>> : "Rechecks gates before exec; holds the transferred lease\n<size:16>[admit_host/release]</size>"
+SwarmPlatform.SessionHostM1M2 --> SwarmPlatform.CapacityS3 <<Relationship-UmVsYXRpb25zaGlw>> : "Rechecks gates before requesting dispatcher start; holds lease until confirmed absence\n<size:16>[admit_host/release]</size>"
 SwarmPlatform.SessionHostM1M2 --> SwarmPlatform.Trust <<Relationship-UmVsYXRpb25zaGlw>> : "Re-verifies grants and revocation at enqueue and dispatch\n<size:16>[verify/granted]</size>"
 SwarmPlatform.SessionHostM1M2 --> SwarmPlatform.AgentHarnessSession <<Relationship-UmVsYXRpb25zaGlw>> : "Execs and holds the process\n<size:16>[process group]</size>"
 SwarmPlatform.BridgeM3.BridgeCore --> SwarmPlatform.BridgeM3.TrustGate <<Relationship-UmVsYXRpb25zaGlw>> : "Checks every inbound envelope\n<size:16>[verify()]</size>"
