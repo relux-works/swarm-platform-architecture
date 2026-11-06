@@ -26,7 +26,7 @@ A declared platform skip is a test that calls `t.Skip` with a reason when its pl
    - `TMUX` and `TMUX_TMPDIR`, because a test that drives tmux could otherwise reach a live pane;
    - `A2A_*`, Curator or runtime session variables, and model-provider credential variables. This list is open: a variable that points at a live session or credential belongs here even when it is not named.
 
-   Tests never contact a real homeserver, a real model provider or a live agent socket. The hygiene lane does not yet enforce this with a network control, so reviewers check it in the code. Git fixtures set `GIT_CONFIG_GLOBAL` and `GIT_CONFIG_SYSTEM` to `/dev/null` (Git 2.32 or later), use a synthetic identity and never push. A test whose subject is signing may sign only with a key it generated inside the fixture and, where an agent is used, an agent the fixture started itself; never with a real key or a real agent. Unsetting a variable does not prove that a key or socket is unreachable. Where real keys exist on the host, the lane's mask is the proof.
+   Tests never contact a real homeserver, a real model provider or a live agent socket. The hygiene lane does not yet enforce this with a network control, so reviewers check it in the code. Git fixtures set `GIT_CONFIG_GLOBAL` and `GIT_CONFIG_SYSTEM` to `/dev/null` (Git 2.32 or later), use a synthetic identity and never push. A test whose subject is signing may sign only with a key it generated inside the fixture, used directly as a key file (with `SSH_AUTH_SOCK` unset) or through an agent the fixture started itself; never with a real key or a real agent. Unsetting a variable does not prove that a key or socket is unreachable. Where real keys exist on the host, the lane's mask is the proof.
 
 ## Verification
 
