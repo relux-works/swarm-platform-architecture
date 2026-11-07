@@ -75,25 +75,19 @@ S3 is more than a semaphore: `admit_host(host, job_class) → ok{lease} | refuse
 
 M4 consults `admit_host` at the `capacity` stage. The host re-checks the same gates immediately before requesting dispatcher `host_start` (`start`), because time passes between them. For a remote target, the gates of the target host apply.
 
-<a name="6-hosted-stream-mode-and-its-permission-wire-ivan-curator-objection-2"></a>
-
-## 6. Hosted-stream mode and its permission wire (Curator reviewer objection 2)
+## <a name="6-hosted-stream-mode-and-its-permission-wire-ivan-curator-objection-2"></a>6. Hosted-stream mode and its permission wire (Curator reviewer objection 2)
 
 - agents-management gets a typed launch mode `HostedStream{adapter}`. It also spells the **session-start parameters** from the resolved permission mode (for example Muse `approvalMode`, the Codex app-server approval policy, the Claude stream-json permission mode) into the plan's `session_start` frames.
 - M2 forwards those frames verbatim and chooses nothing.
 - The duplex channel is the versioned ax capability `hosted-stream/1`. Without it the host refuses `capability_unavailable` **before any process exists** (as 0013 §3.5).
 - The plan's `stdin` stays null: a non-null plan stdin is one-shot and closed (0013 §4).
 
-<a name="7-credentials-ivan-curator-objection-3"></a>
-
-## 7. Credentials (Curator reviewer objection 3)
+## <a name="7-credentials-ivan-curator-objection-3"></a>7. Credentials (Curator reviewer objection 3)
 
 - **D-EXECUTOR.** The admitted agent-side executor/holder is the broker consumer: first `curator-run` under the agent account, later `swarma-session-runner` for SH2+ sessions, sharing one launch library. After the UID transition it verifies the caller-composed immutable plan, re-resolves the destination-local protected binding, opens a fresh broker connection and obtains its lease. It does not compose or resolve profiles under the agent account. The plan carries only an opaque `source_ref`; the board records `credential_mode`, never credential material or `source_ref`. The board runner and session-host service embed no broker clients; they ask the dispatcher for execution. The host retains metadata, admission and fences.
 - CIP-0003 item 5 follows the adopted narrow Decision 0021 amendment; the versioned one-shot intake and per-executor credential-injection qualification remain publication/activation gates, not a reason for automatic per-home fallback. Authority: credential broker §3.1 and session host §3.2; the exact intake grammar remains unpublished.
 
-<a name="8-remote-path-ivan-curator-objection-4"></a>
-
-## 8. Remote path (Curator reviewer objection 4)
+## <a name="8-remote-path-ivan-curator-objection-4"></a>8. Remote path (Curator reviewer objection 4)
 
 - The launch intent carries `{profile, profile_pin, project_binding{id, rev, digest}, base_sha, task_ref, io}`. The target host's curator-run composes and refuses on a lock mismatch.
 - Across hosts only the `profile_pin` is compared (fragment digests are host-bound) and continuity is always `seeded_rebuild` or `fresh`.
@@ -102,8 +96,6 @@ M4 consults `admit_host` at the `capacity` stage. The host re-checks the same ga
 - The remote `task` is delivered as M2's first turn (an `authoritative` launch-time item), not in argv or a bundle prompt.
 - The remote executor returns the accepted `profile_pin` and `plan_digest`; a difference from the intent is `refused: pin_mismatch`.
 
-<a name="9-decision-amendment-needed-ivan-curator-suggestion-7"></a>
-
-## 9. Decision amendment needed (Curator reviewer suggestion 7)
+## <a name="9-decision-amendment-needed-ivan-curator-suggestion-7"></a>9. Decision amendment needed (Curator reviewer suggestion 7)
 
 Headless compose-only contradicts 0019 §2–3 and 0021 §6/§8 ("no headless `curator run`"). v1.2 proposes one amendment to both: curator-run gains a compose-only output for headless and hosted-stream modes; hosted start/stop go through the dispatcher at the session host's request (session host §§3.2–3.5; dispatcher §12). This is a launcher-owner decision (D-R3), not something this document adopts.

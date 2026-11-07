@@ -42,9 +42,7 @@ These are the six conditions quoted in `research/pr1-reviews-2026-10-05.md:6–1
 | **TBK-5 — Detector trial, no blocked transition** | **resolved** | D4 shadow trial, reviewer/reasoning exclusions, human-labelled activation threshold and notice-only board results are explicit (`vision/contracts/goals.md:27,39–42`; `vision/VISION.md:258`). The thresholds remain a proposal to measure, not proof of detector accuracy. The failure described by the condition is prevented while the gate remains closed. |
 | **TBK-6 — Landing remains protocol** | **resolved** | O1 expressly leaves landing windows/rulings outside B2/B6 and distinguishes K3's per-landing transaction (`vision/VISION.md:271`). Protocol ownership still needs a named person/accepted source before use. |
 
-<a name="3-ivan-curators-four-objections"></a>
-
-## 3. Curator reviewer's four objections
+## <a name="3-ivan-curators-four-objections"></a>3. Curator reviewer's four objections
 
 Source: `research/pr1-reviews-2026-10-05.md:21–45`.
 
