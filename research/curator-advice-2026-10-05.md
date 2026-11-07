@@ -1,4 +1,4 @@
-[2026-10-05T09:22:27Z] ivan-curator $vsAAqY_hTFN5tgY4lRZ_DFuQjx-dMK4q9hVe9RBtcMo kind=answer to=all re=$K9fErHAEczCYA1TP1uskN_mKPwsGXhqvEwQhSb2EOIA thread=$HCtlBhIBl31rz9p859ZYr6CPBRsg9ENUUNmeb90t83Y
+Product advice record — 2026-10-05 (Curator perspective; advice only).
     # Curator advice on the platform-rebuild vision (DRAFT, advice only)
     
     Advice from the curator orchestrator, not decisions. Pins: curator-spec `43bf0a2` (rc.14), curator main, curator-run `origin/main` (`fbcdbaf`), agents-management `origin/main` (`b30c3ef`). "env §" = curator-spec `protocol/environments.md`.

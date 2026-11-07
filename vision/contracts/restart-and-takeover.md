@@ -1,6 +1,6 @@
 # Contract: admission fence, controlled restart, takeover and resume
 
-Status: VISION v1.2 contract draft. Fixes A-B2 and A-M6 (JR), ivan-curator suggestion 5 (resume replays the stored plan), and tb-keeper condition 1 (no agent restarts daemons). Adopts B's outline (H:405–464, H:813–831). The plain-session (board-free) park semantics are defined here because B leaves them open (H:880–883).
+Status: VISION v1.2 contract draft. Fixes A-B2 and A-M6 (JR), Curator reviewer suggestion 5 (resume replays the stored plan), and tb-keeper condition 1 (no agent restarts daemons). Adopts B's outline (H:405–464, H:813–831). The plain-session (board-free) park semantics are defined here because B leaves them open (H:880–883).
 
 Updated 2026-10-13: accepted architecture-review findings (2026-10-13), aligned to the canonical module contracts; no implementation or activation is claimed.
 
@@ -38,7 +38,7 @@ One record per logical session in the host store, written with fsync **before** 
 
 **A refused or failed step ends the restore path.** Nothing after it runs: no rebind, no delivery of held items, no "restored" notice. The session state becomes `parked_refused{reason}`, the fence stays closed, and the report says which step refused. Accepting drift is a new operator operation (a new `op_id`) that always rebuilds; it does not continue the old one.
 
-**Resume compares first, then replays the stored plan** (ivan-curator suggestion 5; 0013 §3.4–3.5). M1 keeps the record's immutable `launch_plan` exactly as the composer returned it. The plan contains no secret values: credentials are an opaque `source_ref` re-resolved against the protected binding only by the admitted agent-side executor after the UID transition (`launch.md` §7). Step 5 asks the composer for a compare-only answer (digests, no plan) and checks:
+**Resume compares first, then replays the stored plan** (Curator reviewer suggestion 5; 0013 §3.4–3.5). M1 keeps the record's immutable `launch_plan` exactly as the composer returned it. The plan contains no secret values: credentials are an opaque `source_ref` re-resolved against the protected binding only by the admitted agent-side executor after the UID transition (`launch.md` §7). Step 5 asks the composer for a compare-only answer (digests, no plan) and checks:
 - `profile_pin` (`works.relux.curator.profile-pin`) and `fragment_digest` (same host only), `system-modules`;
 - the effective posture: permissions, network profile, credential mode, project-context mode, binding revision.
 

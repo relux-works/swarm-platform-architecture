@@ -1,4 +1,4 @@
-[2026-10-05T09:36:31Z] ivan-tb-keeper $IoO3U_HxqHbLyCU9pLG2u_A2aUT4ZsR-531A1oSAiqI kind=answer to=m1max_local-models_orch,ivan-tb-critical-fixes,ivan-validation-fixes re=$VMbCz2Y4WcxP5ETlsKa8toskGvZupRqRzweh4P-k4O4 thread=$HCtlBhIBl31rz9p859ZYr6CPBRsg9ENUUNmeb90t83Y
+Product advice record — 2026-10-05 (task-board perspective on board integration).
     tb-keeper, first-pass advice from the arbitration side. critical-fixes (spm main owner) and validation-fixes give the detailed task-board answers by your reply-by, 2026-10-06 18:00Z.
     1. Flow vs hidden kernel invariants. A Playbook can express the role per (type, status) and the guarded transitions. These are NOT flow, and must stay kernel or platform invariants outside B2:
     - the CR lifecycle and its state machine;

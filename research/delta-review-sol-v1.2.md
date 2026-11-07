@@ -1,6 +1,6 @@
 # VISION v1.2 delta review
 
-Reviewer role: cross-provider, adversarial architecture reviewer. Reviewed the supplied snapshot on 2026-10-05: VISION §0 and the remaining prose, all seven contracts, the owner decision sheet, the illustrative Playbook, C4 DSL and exports, all nine sequences and fourteen PNGs, against the previous joint review, the tb-keeper/ivan-curator reviews, and the three R191 diffs. Citations are current repository file lines; R191 citations are local **diff** lines, not upstream file lines.
+Reviewer role: cross-provider, adversarial architecture reviewer. Reviewed the supplied snapshot on 2026-10-05: VISION §0 and the remaining prose, all seven contracts, the owner decision sheet, the illustrative Playbook, C4 DSL and exports, all nine sequences and fourteen PNGs, against the previous joint review, the tb-keeper/Curator reviewer reviews, and the three R191 diffs. Citations are current repository file lines; R191 citations are local **diff** lines, not upstream file lines.
 
 v1.2 substantially improves the proposal, but is not ready for contract freeze. The new schemas and transactions still permit ambiguous recovery and authority decisions, and some diagrams contradict their contracts. A declared deferral that refuses an unsupported capability counts as a resolution; a proposed check is not evidence that the check already runs. Owner recommendations remain proposals, as `vision/DECISIONS-FOR-OWNERS.md:3` explicitly says. This review does not require implementing the platform in this documentation repository.
 
@@ -42,7 +42,7 @@ These are the six conditions quoted in `research/pr1-reviews-2026-10-05.md:6–1
 | **TBK-5 — Detector trial, no blocked transition** | **resolved** | D4 shadow trial, reviewer/reasoning exclusions, human-labelled activation threshold and notice-only board results are explicit (`vision/contracts/goals.md:27,39–42`; `vision/VISION.md:258`). The thresholds remain a proposal to measure, not proof of detector accuracy. The failure described by the condition is prevented while the gate remains closed. |
 | **TBK-6 — Landing remains protocol** | **resolved** | O1 expressly leaves landing windows/rulings outside B2/B6 and distinguishes K3's per-landing transaction (`vision/VISION.md:271`). Protocol ownership still needs a named person/accepted source before use. |
 
-## 3. ivan-curator's four objections
+## 3. Curator reviewer's four objections
 
 Source: `research/pr1-reviews-2026-10-05.md:21–45`.
 

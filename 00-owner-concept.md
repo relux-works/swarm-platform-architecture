@@ -39,5 +39,5 @@ Modules, minimally coupled:
 
 ## Asks
 - Inventory what exists and roughly how it works; a common vision; a C4 module diagram; sequence scenarios (keeper start, worker start, remote-worker start, ...).
-- Ask ivan-tb-keeper about anything missing or unclear.
+- Ask the task-board maintainer about anything missing or unclear.
 - Check relux-works/wiki for interaction schemes (not necessarily canon).

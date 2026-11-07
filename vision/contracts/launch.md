@@ -1,6 +1,6 @@
 # Contract: launch transaction, project binding, capacity gates, credentials and the remote path
 
-Status: VISION v1.2 contract draft. Fixes A-M2 and A-M3 (JR), ivan-curator objections 1–4 and suggestions 6–7, and tb-keeper condition 3. Replaces the v1.1 LaunchRequest field list (VISION v1.1 §4.1). The canonical entrypoint and the headless compose-only amendment are owner decisions (D-R3; see §8).
+Status: VISION v1.2 contract draft. Fixes A-M2 and A-M3 (JR), Curator reviewer objections 1–4 and suggestions 6–7, and tb-keeper condition 3. Replaces the v1.1 LaunchRequest field list (VISION v1.1 §4.1). The canonical entrypoint and the headless compose-only amendment are owner decisions (D-R3; see §8).
 
 Updated 2026-10-13: accepted architecture-review findings (2026-10-13), aligned to the canonical module contracts; no implementation or activation is claimed. This revision aligns hosted lifecycle summaries with dispatcher authority.
 
@@ -17,8 +17,8 @@ Updated 2026-10-13: accepted architecture-review findings (2026-10-13), aligned 
 | `schema`, `request_id` | `request_id` is the idempotency key; B4 passes its spawn key (`kernel-guards.md` §5). Same key, same request: the existing result |
 | caller | not a field: derived from the authenticated socket and the caller's grants |
 | `profile` | Curator role profile name |
-| `expect_pin?` | profile pin (`works.relux.curator.profile-pin`, the lock sha256). M4 compares it with the composer's output and refuses `pin_mismatch` before intake. Digests only; no fragment is read (ivan-curator objection 1) |
-| `env` | env-id. It also determines the runtime; the v1.1 `runtime` field is **dropped** (ivan-curator suggestion 7) |
+| `expect_pin?` | profile pin (`works.relux.curator.profile-pin`, the lock sha256). M4 compares it with the composer's output and refuses `pin_mismatch` before intake. Digests only; no fragment is read (Curator reviewer objection 1) |
+| `env` | env-id. It also determines the runtime; the v1.1 `runtime` field is **dropped** (Curator reviewer suggestion 7) |
 | `mode` | `interactive \| headless` |
 | `transport` | `tty \| hosted-stream:<adapter>` (`claude-stream-json`, `codex-app-server`, `muse-serve`) |
 | `continuity` | `fresh \| native_resume:<logical_session_id> \| seeded:<package_id>` (replaces `context`) |
@@ -28,7 +28,7 @@ Updated 2026-10-13: accepted architecture-review findings (2026-10-13), aligned 
 | `permissions?` | `native \| yolo`; silence = `native` (0018 item 5). The per-profile default is the machine knob `permissions.<profile>` (env §12.1), not profile content. Tracked `yolo` refused until a versioned ax capability exists |
 | `network_profile?` | default: the project binding's `egress_profile`; else the machine default |
 | `io_bindings[]` | `{provider, config_ref, audience}` |
-| `goal?` | `{text, until, max_nudges}`; read from JSON on stdin or a file, **never argv**. `swarm launch` has no `--goal` flag (0013 §5; ivan-curator suggestion 6) |
+| `goal?` | `{text, until, max_nudges}`; read from JSON on stdin or a file, **never argv**. `swarm launch` has no `--goal` flag (0013 §5; Curator reviewer suggestion 6) |
 | `native_goal` | boolean: M2 injects the harness's own `/goal` command as the first turn. Never a harness flag |
 | `policy` | `{restart, lifetime, budget}` |
 | `parent?`, `board_ref?` | kept by M4 and the host; **never sent to the composer** (0021 §4). `board_ref = {board, element, state, flow_digest, flow_generation, run_id}` |
@@ -41,7 +41,7 @@ Updated 2026-10-13: accepted architecture-review findings (2026-10-13), aligned 
 
 `{binding_id, rev, digest, product, project, repo{url, identity}, base{policy, exact_sha}, worktree_policy, dirty_policy, hosts[{name, host_key_fingerprint, security_domain}], jail_project, egress_profile, audiences[], rooms[], allow_from[], role_bindings[{role, standing_session, profile_pin_compat, max_slots}], authorized_by{mandate_ref}}`
 
-- Operator-owned and stored in S4. A new revision needs a mandate; the role → profile mapping lives here, not in a repo Playbook (env §10.3; ivan-curator objection 1).
+- Operator-owned and stored in S4. A new revision needs a mandate; the role → profile mapping lives here, not in a repo Playbook (env §10.3; Curator reviewer objection 1).
 - Pinned as `{id, rev, digest}` in the intent, the admitted plan, `RUN-*` and the HandoffPackage.
 - Rechecked at dispatch (the host's `admit` stage) and at every resume: a different revision or digest is `refused: binding_drift`.
 - `exact_sha` is resolved at dispatch from the base policy; a different landed head is `refused: wrong_base`.
@@ -75,19 +75,19 @@ S3 is more than a semaphore: `admit_host(host, job_class) → ok{lease} | refuse
 
 M4 consults `admit_host` at the `capacity` stage. The host re-checks the same gates immediately before requesting dispatcher `host_start` (`start`), because time passes between them. For a remote target, the gates of the target host apply.
 
-## 6. Hosted-stream mode and its permission wire (ivan-curator objection 2)
+## 6. Hosted-stream mode and its permission wire (Curator reviewer objection 2)
 
 - agents-management gets a typed launch mode `HostedStream{adapter}`. It also spells the **session-start parameters** from the resolved permission mode (for example Muse `approvalMode`, the Codex app-server approval policy, the Claude stream-json permission mode) into the plan's `session_start` frames.
 - M2 forwards those frames verbatim and chooses nothing.
 - The duplex channel is the versioned ax capability `hosted-stream/1`. Without it the host refuses `capability_unavailable` **before any process exists** (as 0013 §3.5).
 - The plan's `stdin` stays null: a non-null plan stdin is one-shot and closed (0013 §4).
 
-## 7. Credentials (ivan-curator objection 3)
+## 7. Credentials (Curator reviewer objection 3)
 
 - **D-EXECUTOR.** The admitted agent-side executor/holder is the broker consumer: first `curator-run` under the agent account, later `swarma-session-runner` for SH2+ sessions, sharing one launch library. After the UID transition it verifies the caller-composed immutable plan, re-resolves the destination-local protected binding, opens a fresh broker connection and obtains its lease. It does not compose or resolve profiles under the agent account. The plan carries only an opaque `source_ref`; the board records `credential_mode`, never credential material or `source_ref`. The board runner and session-host service embed no broker clients; they ask the dispatcher for execution. The host retains metadata, admission and fences.
 - CIP-0003 item 5 follows the adopted narrow Decision 0021 amendment; the versioned one-shot intake and per-executor credential-injection qualification remain publication/activation gates, not a reason for automatic per-home fallback. Authority: credential broker §3.1 and session host §3.2; the exact intake grammar remains unpublished.
 
-## 8. Remote path (ivan-curator objection 4)
+## 8. Remote path (Curator reviewer objection 4)
 
 - The launch intent carries `{profile, profile_pin, project_binding{id, rev, digest}, base_sha, task_ref, io}`. The target host's curator-run composes and refuses on a lock mismatch.
 - Across hosts only the `profile_pin` is compared (fragment digests are host-bound) and continuity is always `seeded_rebuild` or `fresh`.
@@ -96,6 +96,6 @@ M4 consults `admit_host` at the `capacity` stage. The host re-checks the same ga
 - The remote `task` is delivered as M2's first turn (an `authoritative` launch-time item), not in argv or a bundle prompt.
 - The remote executor returns the accepted `profile_pin` and `plan_digest`; a difference from the intent is `refused: pin_mismatch`.
 
-## 9. Decision amendment needed (ivan-curator suggestion 7)
+## 9. Decision amendment needed (Curator reviewer suggestion 7)
 
 Headless compose-only contradicts 0019 §2–3 and 0021 §6/§8 ("no headless `curator run`"). v1.2 proposes one amendment to both: curator-run gains a compose-only output for headless and hosted-stream modes; hosted start/stop go through the dispatcher at the session host's request (session host §§3.2–3.5; dispatcher §12). This is a launcher-owner decision (D-R3), not something this document adopts.

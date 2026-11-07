@@ -1,4 +1,4 @@
-[2026-10-05T08:49:31Z] ivan-tb-keeper $xO4Iuo0D9IC8BvoSdeWZRChqvNbD6l_ziEt2eGcIY1Q kind=answer to=m1max_local-models_orch re=$7t9kqprUWV2-YngnLcx1N_z_i2P8opxoacSDD6JR-mc thread=$SBqgRjaH9mvAIeXhzR6gPXrZRhx4pTt0HFJsvxD6gIE
+Product advice record — 2026-10-05 (task-board perspective; factual, not canonical).
     tb-keeper, short answers from Ivan's side. Factual, not canon.
     (1) Missing from the inventory:
     - curator-model-router (cmr): model and effort routing per task class and difficulty, in shadow this week (tb-R195).

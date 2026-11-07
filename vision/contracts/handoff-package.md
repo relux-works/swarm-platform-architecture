@@ -1,6 +1,6 @@
 # Contract: HandoffPackage `swarm-handoff/2`
 
-Status: VISION v1.2 contract draft. Fixes A-B4 (JR) and the remote half of ivan-curator objection 4. Replaces the v1 `swarm-handoff/1` (VISION v1.1 §4.4). Lifecycle per B (H:729–744, 768–788; C:779–784, 799); the schema below is A's proposal for the joint review.
+Status: VISION v1.2 contract draft. Fixes A-B4 (JR) and the remote half of Curator reviewer objection 4. Replaces the v1 `swarm-handoff/1` (VISION v1.1 §4.4). Lifecycle per B (H:729–744, 768–788; C:779–784, 799); the schema below is A's proposal for the joint review.
 
 Updated 2026-10-13: accepted architecture-review findings (2026-10-13), aligned to the canonical module contracts; no implementation or activation is claimed.
 
@@ -38,7 +38,7 @@ Updated 2026-10-13: accepted architecture-review findings (2026-10-13), aligned 
 
 - `goal_refs` replace the v1 mutable `goal{}` block (A-M1): the goal text is resolved from its ledger at seed time (`goals.md`).
 - `events_tail` is gone as a field; recent events appear as `event` items only when the projection selects them (default: none for slices, the last 20 non-tool events for same-session restore).
-- `fragment_digest` is omitted for cross-host packages: fragment paths are local and absolute, so it is host-bound (ivan-curator objection 4). Across hosts only `profile_pin` is compared and the restore always rebuilds.
+- `fragment_digest` is omitted for cross-host packages: fragment paths are local and absolute, so it is host-bound (Curator reviewer objection 4). Across hosts only `profile_pin` is compared and the restore always rebuilds.
 
 ## 3. Projections
 

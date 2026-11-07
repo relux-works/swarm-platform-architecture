@@ -6,7 +6,7 @@ Architecture of the swarm platform rebuild (product: swarm). Owner: Alexis. Stat
 - `vision/VISION.md`: target architecture (modules, contracts, reuse/adapt/build, open decisions, phased plan).
 - `diagrams/`: C4 (Structurizr DSL) and sequences (PlantUML); rendered PNGs in `diagrams/artefacts/`. See `diagrams/README.md` to render.
 - `conventions/`: engineering conventions for every module, starting with [test hermeticity](conventions/TEST-HERMETICITY.md).
-- `research/`: inventories (ours / Ivan's), the herdr study, advice from ivan-curator and tb-keeper.
+- `research/`: inventories (ours / Ivan's), the herdr study, advice from the Curator and task-board maintainers.
 
 ## Tools
 | Tool | Purpose | Command | Output |
